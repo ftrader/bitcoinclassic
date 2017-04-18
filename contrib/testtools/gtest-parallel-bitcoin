@@ -5,7 +5,7 @@
 # Adaptations for running Bitcoin's tests (using runner based on
 # Boost Test Library instead of Google Test):
 # Copyright (c) 2016 The Bitcoin Unlimited developers
-# Copyright (c) 2017 The Bitcoin developers
+# Copyright (c) 2017 freetrader <freetrader@tuta.io> (a Bitcoin developer)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
