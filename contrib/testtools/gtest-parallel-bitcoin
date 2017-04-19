@@ -194,7 +194,7 @@ class FilterFormat:
                 (exit_code, time_ms) = args
                 (binary, test) = self.tests[job_id]
                 self.print_test_status(test, time_ms)
-                if exit_code == 0:
+                if exit_code == 0 or (exit_code == 200 and not options.fail_empty_suites):
                     self.passed.append(job_id)
                 else:
                     self.failed.append(job_id)
@@ -353,6 +353,8 @@ parser.add_option('-d', '--output_dir', type='string',
                   help='output directory for test logs')
 parser.add_option('-r', '--repeat', type='int', default=1,
                   help='repeat tests')
+parser.add_option('--fail_empty_suites', action='store_true', default=False,
+                  help='fail empty test suites')
 parser.add_option('--failed', action='store_true', default=False,
                   help='run only failed and new tests')
 parser.add_option('-w', '--workers', type='int',
@@ -504,7 +506,7 @@ def run_job((command, job_id, test, test_index)):
         "time": runtime_ms,
     })
     logger.log(job_id, "EXIT", (code, runtime_ms), file_name=test_file)
-    if code == 0:
+    if code == 0 or (code == 200 and not options.fail_empty_suites):
         return runtime_ms
     global exit_code
     exit_code = code
