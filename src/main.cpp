@@ -1,11 +1,13 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
+// Copyright (c) 2017 Tom Zander <tomz@freedommail.ch>
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "main.h"
 
 #include "addrman.h"
+#include "Application.h"
 #include "arith_uint256.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -1967,6 +1969,12 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             view.SetBestBlock(pindex->GetBlockHash());
         return true;
     }
+    assert(pindex->pprev);
+
+    // enable UAHF (aka BCC) on first block after the calculated timestamp
+    if (!fJustCheck && Application::uahfChainState() == Application::UAHFWaiting
+            && pindex->pprev->GetMedianTimePast() >= Application::uahfStartTime())
+        Blocks::DB::instance()->setUahfForkBlock(block.GetHash()); // this will update Application::uahfChainState
 
     const int64_t timeBarrier = GetTime() - 24 * 3600 * std::max(1, nScriptCheckThreads);
     // Blocks that have varius days of POW behind them makes them secure in
@@ -3002,12 +3010,6 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     // Size limits
     if (block.vtx.empty())
         return state.DoS(100, error("CheckBlock(): Missing coinbase tx"), REJECT_INVALID, "bad-blk-length");
-    const std::uint32_t blockSizeAcceptLimit = Policy::blockSizeAcceptLimit();
-    const std::uint32_t blockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-    if (block.vtx.size() > blockSizeAcceptLimit || blockSize > blockSizeAcceptLimit) {
-        const float punishment = (blockSize - blockSizeAcceptLimit) / (float) blockSizeAcceptLimit;
-        return state.DoS(10 * punishment + 0.5, error("CheckBlock(): block larger than user-limit"), REJECT_EXCEEDSLIMIT, "bad-blk-length");
-    }
 
     // All potential-corruption validation must be done before we do any
     // transaction validation, as otherwise we may mark the header as invalid
@@ -3034,6 +3036,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     {
         nSigOps += GetLegacySigOpCount(tx);
     }
+    const std::uint32_t blockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
     if (nSigOps > Policy::blockSigOpAcceptLimit(blockSize))
         return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"),
                          REJECT_INVALID, "bad-blk-sigops");
@@ -3105,7 +3108,7 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
                               : block.GetBlockTime();
 
     // Check that all transactions are finalized
-    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
+    for (const CTransaction& tx : block.vtx) {
         if (!IsFinalTx(tx, nHeight, nLockTimeCutoff)) {
             return state.DoS(10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
         }
@@ -3113,13 +3116,31 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
 
     // Enforce block.nVersion=2 rule that the coinbase starts with serialized block height
     // if 750 of the last 1,000 blocks are version 2 or greater (51/100 if testnet):
-    if (block.nVersion >= 2 && IsSuperMajority(2, pindexPrev, consensusParams.nMajorityEnforceBlockUpgrade, consensusParams))
-    {
+    if (block.nVersion >= 2 && IsSuperMajority(2, pindexPrev, consensusParams.nMajorityEnforceBlockUpgrade, consensusParams)) {
         CScript expect = CScript() << nHeight;
         if (block.vtx[0].vin[0].scriptSig.size() < expect.size() ||
             !std::equal(expect.begin(), expect.end(), block.vtx[0].vin[0].scriptSig.begin())) {
             return state.DoS(100, error("%s: block height mismatch in coinbase", __func__), REJECT_INVALID, "bad-cb-height");
         }
+    }
+
+    const std::uint32_t blockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+    if (pindexPrev && Application::uahfChainState() != Application::UAHFDisabled) {
+        const int64_t startTime = Application::uahfStartTime();
+        if (pindexPrev->GetMedianTimePast() >= startTime) {
+            // this is a UAHF-chain block!
+            if (pindexPrev->pprev->GetMedianTimePast() < startTime) {
+                // If UAHF is enabled for the curent block, but not for the previous
+                // block, we must check that the block is larger than 1MB.
+                 if (blockSize <= MAX_BLOCK_SIZE)
+                     return state.DoS(100, false, REJECT_INVALID, "bad-blk-too-small", false, "size limits failed");
+            }
+        }
+    }
+    const std::uint32_t blockSizeAcceptLimit = Policy::blockSizeAcceptLimit();
+    if (block.vtx.size() > blockSizeAcceptLimit || blockSize > blockSizeAcceptLimit) {
+        const float punishment = (blockSize - blockSizeAcceptLimit) / (float) blockSizeAcceptLimit;
+        return state.DoS(10 * punishment + 0.5, error("CheckBlock(): block larger than user-limit"), REJECT_EXCEEDSLIMIT, "bad-blk-length");
     }
 
     return true;

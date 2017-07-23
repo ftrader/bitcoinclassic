@@ -28,7 +28,7 @@ static const unsigned int MAX_STANDARD_TX_SIGOPS = MAX_BLOCK_SIGOPS_PER_MB/5;
 /** Default for -maxmempool, maximum megabytes of mempool memory usage */
 static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE = 300;
 /** Default for -blocksizeacceptlimit */
-static const int32_t DEFAULT_BLOCK_ACCEPT_SIZE = 3700000;
+static const int32_t DEFAULT_BLOCK_ACCEPT_SIZE = 8000000;
 
 /**
  * Standard script verification flags that standard transactions will comply
