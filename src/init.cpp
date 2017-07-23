@@ -721,8 +721,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     if (Application::uahfChainState() != Application::UAHFDisabled) {
         nLocalServices |= NODE_BITCOIN_CASH;
-        if (Policy::blockSizeAcceptLimit() < 8000000)
-            return InitError("The block size accept limit is too low, for BitcoinCash the minimum is 8MB. Bitcoin Classic is shutting down.");
+        if (Params().NetworkIDString() ==  CBaseChainParams::MAIN) {
+            if (Policy::blockSizeAcceptLimit() < 8000000)
+                return InitError("The block size accept limit is too low, for BitcoinCash the minimum is 8MB. Bitcoin Classic is shutting down.");
+            if (GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE) <= 1000000)
+                return InitError("The maxblocksize mining limit is too low, for BitcoinCash it should be over 1MB. Bitcoin Classic is shutting down.");
+        }
     }
 
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log

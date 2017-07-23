@@ -9,6 +9,7 @@
 #include "pubkey.h"
 
 #include "amount.h"
+#include "Application.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "coins.h"
@@ -127,7 +128,7 @@ CBlockTemplate* Mining::CreateNewBlock(const CChainParams& chainparams) const
 
     // Minimum block size you want to create; block will be filled with free transactions
     // until there are no more or the block reaches this size:
-    const uint32_t nBlockMinSize = std::min<uint32_t>(GetArg("-blockminsize", DEFAULT_BLOCK_MIN_SIZE), nBlockMaxSize);
+    uint32_t nBlockMinSize = std::min<uint32_t>(GetArg("-blockminsize", DEFAULT_BLOCK_MIN_SIZE), nBlockMaxSize);
 
     // Collect memory pool transactions into the block
     CTxMemPool::setEntries inBlock;
@@ -153,6 +154,13 @@ CBlockTemplate* Mining::CreateNewBlock(const CChainParams& chainparams) const
     {
         LOCK2(cs_main, mempool.cs);
         CBlockIndex* pindexPrev = chainActive.Tip();
+
+        if (Application::uahfChainState() == Application::UAHFWaiting
+                && pindexPrev->GetMedianTimePast() < Application::uahfStartTime()) { // we are not allowed to mine over 1MB yet.
+            nBlockMaxSize = std::min<uint32_t>(1000000, nBlockMaxSize);
+            nBlockMinSize = std::min<uint32_t>(nBlockMaxSize, nBlockMinSize);
+        }
+
         const int nHeight = pindexPrev->nHeight + 1;
         const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
 
