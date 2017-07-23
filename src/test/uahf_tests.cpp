@@ -132,7 +132,7 @@ BOOST_AUTO_TEST_CASE(Test_Enabling)
 BOOST_AUTO_TEST_CASE(Test_BlockValidation)
 {
     std::vector<uint256> hashes;
-    hashes.resize(20);
+    hashes.resize(21);
 
     // create 20 block-indexes.
     CBlockIndex *tip = Blocks::indexMap.begin()->second;
@@ -159,6 +159,100 @@ BOOST_AUTO_TEST_CASE(Test_BlockValidation)
     accepted = ContextualCheckBlock(block, state, tip);
     BOOST_CHECK(accepted);
     BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFWaiting);
+
+    // Accept it so we can create small blocks again.
+    tip = createBlockIndex(tip, 20, 2500, &hashes[20]);
+
+    // Base transaction is valid before the fork.
+    mapArgs["-uahfstarttime"] = "2000";
+    MockApplication::doInit();
+    transactions.clear();
+    CMutableTransaction tx;
+    TxUtils::RandomTransaction(tx, TxUtils::SingleOutput);
+    transactions.push_back(tx);
+    block = createBlock(tip, transactions);
+    BOOST_CHECK(ContextualCheckBlock(block, state, tip));
+
+
+    // Base transaction is still valid after sunset.
+    mapArgs["-uahfstarttime"] = "1400";
+    MockApplication::doInit();
+    BOOST_CHECK(ContextualCheckBlock(block, state, tip));
+
+    // Wrong commitment, still valid.
+    tx.vout[0].scriptPubKey = CScript() << OP_RETURN << OP_0;
+    transactions[0] = tx;
+    block = createBlock(tip, transactions);
+    BOOST_CHECK(ContextualCheckBlock(block, state, tip));
+
+    const Consensus::Params &params = Params().GetConsensus();
+    // Anti replay commitment, not valid anymore.
+    tx.vout[0].scriptPubKey = CScript() << OP_RETURN << params.antiReplayOpReturnCommitment;
+    transactions[0] = tx;
+    block = createBlock(tip, transactions);
+    BOOST_CHECK_EQUAL(ContextualCheckBlock(block, state, tip), false);
+
+    // Anti replay commitment, **At** sunset.
+    tip->nHeight = Params().GetConsensus().antiReplayOpReturnSunsetHeight - 1; // (remember, tip is pindexPREV)
+    BOOST_CHECK_EQUAL(ContextualCheckBlock(block, state, tip), false);
+
+    // Anti replay commitment, disabled after sunset.
+    logDebug() << "sunset" << Params().GetConsensus().antiReplayOpReturnSunsetHeight;
+    tip->nHeight = Params().GetConsensus().antiReplayOpReturnSunsetHeight;
+    BOOST_CHECK(ContextualCheckBlock(block, state, tip));
+
+    // Anti replay commitment, disabled before start time.
+    mapArgs["-uahfstarttime"] = "3000";
+    MockApplication::doInit();
+    BOOST_CHECK(ContextualCheckBlock(block, state, tip));
+}
+
+BOOST_AUTO_TEST_CASE(Test_isCommitment) {
+    std::vector<unsigned char> data{};
+
+    // Empty commitment.
+    auto s = CScript() << OP_RETURN << data;
+    BOOST_CHECK(s.isCommitment(data));
+
+    // Commitment to a value of the wrong size.
+    data.push_back(42);
+    BOOST_CHECK(!s.isCommitment(data));
+
+    // Not a commitment.
+    s = CScript() << data;
+    BOOST_CHECK(!s.isCommitment(data));
+
+    // Non empty commitment.
+    s = CScript() << OP_RETURN << data;
+    BOOST_CHECK(s.isCommitment(data));
+
+    // Commitment to the wrong value.
+    data[0] = 0x42;
+    BOOST_CHECK(!s.isCommitment(data));
+
+    // Commitment to a larger value.
+    std::string str = "Bitcoin: A peer-to-peer Electronic Cash System";
+    data = std::vector<unsigned char>(str.begin(), str.end());
+    BOOST_CHECK(!s.isCommitment(data));
+
+    s = CScript() << OP_RETURN << data;
+    BOOST_CHECK(s.isCommitment(data));
+
+    // 64 bytes commitment, still valid.
+    data.resize(64);
+    s = CScript() << OP_RETURN << data;
+    BOOST_CHECK(s.isCommitment(data));
+
+    // Commitment is too large.
+    data.push_back(23);
+    s = CScript() << OP_RETURN << data;
+    BOOST_CHECK(!s.isCommitment(data));
+
+    // Check with the actual replay commitment we are going to use.
+    SelectParams(CBaseChainParams::MAIN);
+    const Consensus::Params &params = Params().GetConsensus();
+    s = CScript() << OP_RETURN << params.antiReplayOpReturnCommitment;
+    BOOST_CHECK(s.isCommitment(params.antiReplayOpReturnCommitment));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

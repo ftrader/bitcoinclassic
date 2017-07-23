@@ -208,6 +208,28 @@ bool CScript::IsPayToScriptHash() const
             (*this)[22] == OP_EQUAL);
 }
 
+bool CScript::isCommitment(const std::vector<unsigned char> &data) const
+{
+    // To ensure we have an immediate push, we limit the commitment size to 64
+    // bytes. In addition to the data themselves, we have 2 extra bytes:
+    // OP_RETURN and the push opcode itself.
+    if (data.size() > 64 || this->size() != data.size() + 2) {
+        return false;
+    }
+
+    if ((*this)[0] != OP_RETURN || (*this)[1] != data.size()) {
+        return false;
+    }
+
+    for (size_t i = 0; i < data.size(); i++) {
+        if ((*this)[i + 2] != data[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool CScript::IsPushOnly(const_iterator pc) const
 {
     while (pc < end())
