@@ -285,6 +285,9 @@ enum {
     // make xthin requests
     NODE_XTHIN = (1 << 4),
 
+    // NODE_CASH means the node supports and follows the 'UAHF' chain.
+    NODE_BITCOIN_CASH = (1 << 5),
+
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
     // isn't getting used, or one not being used much, and notify the
     // bitcoin-development mailing list. Remember that service bits are just

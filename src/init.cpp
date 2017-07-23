@@ -719,6 +719,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (GetBoolArg("-use-thinblocks", true))
         nLocalServices |= NODE_XTHIN;
 
+    if (Application::uahfChainState() != Application::UAHFDisabled) {
+        nLocalServices |= NODE_BITCOIN_CASH;
+    }
+
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
 
     // Initialize elliptic curve code
