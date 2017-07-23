@@ -2069,7 +2069,12 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         const CTransaction &tx = block.vtx[i];
 
         nInputs += tx.vin.size();
-        nSigOps += GetLegacySigOpCount(tx);
+
+        const uint32_t txSigOps = GetLegacySigOpCount(tx);
+        if (txSigOps > MAX_BLOCK_SIGOPS_PER_MB)
+            return state.DoS(100, error("ConnectBlock(): too many sigops in tx"),
+                             REJECT_INVALID, "bad-tx-sigops");
+        nSigOps += txSigOps;
         if (nSigOps > maxSigOps)
             return state.DoS(100, error("ConnectBlock(): too many sigops"),
                              REJECT_INVALID, "bad-blk-sigops");

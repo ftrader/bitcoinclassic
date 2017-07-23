@@ -409,11 +409,13 @@ class FullBlockTest(ComparisonTestFramework):
         # Add a block with double MAX_BLOCK_SIGOPS_PER_MB sigops to a 1.5 MB block
         lots_of_checksigs = CScript([OP_CHECKSIG] * (MAX_BLOCK_SIGOPS_PER_MB * 2 - 1))
         block(31, spend=get_spendable_output(), script=lots_of_checksigs, block_size=1500000)
-        yield accepted()
+        # rejected because 1 TX has too many sigops.
+        yield rejected()
 
         # Add a block with double MAX_BLOCK_SIGOPS_PER_MB sigops to a 2 MB block
         block(32, spend=get_spendable_output(), script=lots_of_checksigs, block_size=MAX_BLOCK_SIZE)
-        yield accepted()
+        # rejected because 1 TX has too many sigops.
+        yield rejected()
 
         # Make the next block have one additional sigop, and ensure it is rejected
         too_many_checksigs = CScript([OP_CHECKSIG] * (MAX_BLOCK_SIGOPS_PER_MB * 2))
