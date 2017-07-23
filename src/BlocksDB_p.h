@@ -35,6 +35,7 @@ public:
 
     CChain headersChain;
     std::list<CBlockIndex*> headerChainTips;
+    uint256 uahfStartBlock;
 };
 }
 

@@ -30,6 +30,9 @@
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 
+// if enabled, this client defaults the fork on.
+#define UAHF_CLIENT 1
+
 // static
 Application * Application::instance()
 {
@@ -84,6 +87,18 @@ void Application::init()
             }
         });
     }
+
+    m_uahfStartTme = std::max<int64_t>(0, GetArg("-uahfstarttime",
+#ifdef UAHF_CLIENT
+                                   1501590000));
+#else
+                                   0));
+#endif
+    if (m_uahfStartTme == 0)
+        m_uahfState = UAHFDisabled;
+    else
+        m_uahfState = UAHFWaiting; // will be updated when the chain is parsed.
+
 }
 
 Application::~Application()
@@ -157,4 +172,19 @@ const char *Application::clientName()
 bool Application::closingDown()
 {
     return instance()->m_closingDown;
+}
+
+Application::UAHFState Application::uahfChainState()
+{
+    return Application::instance()->m_uahfState;
+}
+
+void Application::setUahfChainState(Application::UAHFState state)
+{
+    Application::instance()->m_uahfState = state;
+}
+
+int64_t Application::uahfStartTime()
+{
+    return Application::instance()->m_uahfStartTme;
 }

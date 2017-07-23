@@ -87,9 +87,14 @@ public:
      * @returns true if the header became the new main-chain tip.
      */
     bool appendHeader(CBlockIndex *block);
+    /// allow adding one block, this API is primarily meant for unit tests.
+    bool appendBlock(CBlockIndex *block, int lastBlockFile);
 
     const CChain &headerChain();
     const std::list<CBlockIndex*> & headerChainTips();
+
+    const uint256 &uahfForkBlock() const;
+    bool setUahfForkBlock(const uint256 &blockId);
 
 private:
     static DB *s_instance;

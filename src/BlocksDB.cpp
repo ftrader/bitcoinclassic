@@ -23,6 +23,7 @@ static const char DB_BLOCK_INDEX = 'b';
 static const char DB_FLAG = 'F';
 static const char DB_REINDEX_FLAG = 'R';
 static const char DB_LAST_BLOCK = 'l';
+static const char DB_UAHF_FORK_BLOCK = 'U';
 
 namespace {
 CBlockIndex * InsertBlockIndex(uint256 hash)
@@ -235,12 +236,14 @@ Blocks::DB *Blocks::DB::instance()
 
 void Blocks::DB::createInstance(size_t nCacheSize, bool fWipe)
 {
+    Blocks::indexMap.clear();
     delete Blocks::DB::s_instance;
     Blocks::DB::s_instance = new Blocks::DB(nCacheSize, false, fWipe);
 }
 
 void Blocks::DB::createTestInstance(size_t nCacheSize)
 {
+    Blocks::indexMap.clear();
     delete Blocks::DB::s_instance;
     Blocks::DB::s_instance = new Blocks::DB(nCacheSize, true);
 }
@@ -368,6 +371,11 @@ bool Blocks::DB::CacheAllBlockInfos()
         appendHeader(iter->second);
     }
 
+    if (Application::uahfChainState() != Application::UAHFDisabled) {
+        Read(DB_UAHF_FORK_BLOCK, d->uahfStartBlock);
+        setUahfForkBlock(d->uahfStartBlock);
+    }
+
     return true;
 }
 
@@ -437,6 +445,14 @@ bool Blocks::DB::appendHeader(CBlockIndex *block)
     return false;
 }
 
+bool Blocks::DB::appendBlock(CBlockIndex *block, int lastBlockFile)
+{
+    std::vector<std::pair<int, const CBlockFileInfo*> > files;
+    std::vector<const CBlockIndex*> blocks;
+    blocks.push_back(block);
+    return WriteBatchSync(files, lastBlockFile, blocks);
+}
+
 const CChain &Blocks::DB::headerChain()
 {
     return d->headersChain;
@@ -445,6 +461,30 @@ const CChain &Blocks::DB::headerChain()
 const std::list<CBlockIndex *> &Blocks::DB::headerChainTips()
 {
     return d->headerChainTips;
+}
+
+bool Blocks::DB::setUahfForkBlock(const uint256 &blockId)
+{
+    bool writeOk = true;
+    if (d->uahfStartBlock != blockId) {
+        d->uahfStartBlock = blockId;
+        writeOk = Write(DB_UAHF_FORK_BLOCK, d->uahfStartBlock);
+    }
+
+    if (writeOk && !d->uahfStartBlock.IsNull()) {
+        auto mi = Blocks::indexMap.find(d->uahfStartBlock);
+        if (mi != Blocks::indexMap.end()) {
+            const CBlockIndex *bi = mi->second;
+            if (bi->nTime > Application::uahfStartTime() && headerChain().Contains(bi))
+                Application::setUahfChainState(Application::UAHFActive);
+        }
+    }
+    return writeOk;
+}
+
+const uint256 &Blocks::DB::uahfForkBlock() const
+{
+    return d->uahfStartBlock;
 }
 
 

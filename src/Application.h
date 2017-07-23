@@ -40,6 +40,12 @@ public:
     Application();
     ~Application();
 
+    enum UAHFState {
+        UAHFDisabled,
+        UAHFWaiting,
+        UAHFActive
+    };
+
     /// returns (and optionally creates) an instance
     static Application *instance();
 
@@ -77,6 +83,10 @@ public:
 
     static bool closingDown();
 
+    static UAHFState uahfChainState();
+    static void setUahfChainState(UAHFState state);
+    static int64_t uahfStartTime();
+
 protected:
     /// only called from constructor. Useful in unit tests.
     void init();
@@ -90,6 +100,8 @@ private:
 
     int m_returnCode;
     bool m_closingDown;
+    UAHFState m_uahfState;
+    int64_t m_uahfStartTme;
 };
 
 #endif
