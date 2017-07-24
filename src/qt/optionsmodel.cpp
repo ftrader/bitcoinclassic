@@ -17,6 +17,7 @@
 #include "net.h"
 #include "policy/policy.h" // for DEFAULT_BLOCK_ACCEPT_SIZE
 #include <BlocksDB.h> // for -dbcache defaults
+#include <Application.h>
 
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
@@ -100,8 +101,16 @@ void OptionsModel::Init(bool resetSettings)
         addOverriddenOption("-blocksizeacceptlimitbytes");
     else if (mapArgs.count("-excessiveblocksize"))
         addOverriddenOption("-excessiveblocksize");
-    else
-        SoftSetArg("-blocksizeacceptlimitbytes", settings.value("blockSizeAcceptLimitBytes").toString().toStdString());
+    else {
+        QVariant limit = settings.value("blockSizeAcceptLimitBytes");
+        if (Application::uahfChainState() != Application::UAHFDisabled) {
+            bool ok;
+            int value = settings.value("blockSizeAcceptLimitBytes").toInt(&ok);
+            if (ok && value < 8000000)
+                limit = QVariant(8000000);
+        }
+        SoftSetArg("-blocksizeacceptlimitbytes", limit.toString().toStdString());
+    }
 
     // Wallet
 #ifdef ENABLE_WALLET
