@@ -369,7 +369,6 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
             "  ],\n"
             "  \"noncerange\" : \"00000000ffffffff\",   (string) A range of valid nonces\n"
             "  \"sigoplimit\" : n,                 (numeric) limit of sigops in blocks\n"
-            "  \"sighashlimit\" : n,               (numeric) limit of sighash-bytes in blocks\n"
             "  \"sizelimit\" : n,                  (numeric) limit of block size. (deprecated)\n"
             "  \"curtime\" : ttt,                  (numeric) current timestamp in seconds since epoch (Jan 1 1970 GMT)\n"
             "  \"bits\" : \"xxx\",                 (string) compressed target of next block\n"
