@@ -4,6 +4,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <Application.h>
 #include "base58.h"
 #include "chain.h"
 #include "coins.h"
@@ -756,6 +757,11 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp)
     }
 
     bool fHashSingle = ((nHashType & ~SIGHASH_ANYONECANPAY) == SIGHASH_SINGLE);
+    uint32_t validationFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
+    if (Application::uahfChainState() > Application::UAHFRulesActive) {
+        nHashType |= SIGHASH_FORKID;
+        validationFlags |= SCRIPT_ENABLE_SIGHASH_FORKID;
+    }
 
     // Script verification errors
     UniValue vErrors(UniValue::VARR);
@@ -784,7 +790,7 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp)
             txin.scriptSig = CombineSignatures(prevPubKey, TransactionSignatureChecker(&txConst, i, amount), txin.scriptSig, txv.vin[i].scriptSig);
         }
         ScriptError serror = SCRIPT_ERR_OK;
-        if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, TransactionSignatureChecker(&txConst, i, amount), &serror)) {
+        if (!VerifyScript(txin.scriptSig, prevPubKey, validationFlags, TransactionSignatureChecker(&txConst, i, amount), &serror)) {
             TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
         }
     }

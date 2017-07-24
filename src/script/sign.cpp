@@ -121,7 +121,12 @@ bool ProduceSignature(const BaseSignatureCreator& creator, const CScript& fromPu
     }
 
     // Test solution
-    return VerifyScript(scriptSig, fromPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, creator.Checker());
+    // Because we have no good way to get nHashType here, we just try with and
+    // without enabling it. One of the two must pass.
+    // TODO: Remove after the fork.
+    return VerifyScript(scriptSig, fromPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, creator.Checker())
+            || VerifyScript(scriptSig, fromPubKey,
+                            STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_SIGHASH_FORKID, creator.Checker());
 }
 
 bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CMutableTransaction& txTo, unsigned int nIn, CAmount amount, int nHashType)
@@ -183,8 +188,15 @@ static CScript CombineMultisig(const CScript& scriptPubKey, const BaseSignatureC
             if (sigs.count(pubkey))
                 continue; // Already got a sig for this pubkey
 
-            if (checker.CheckSig(sig, pubkey, scriptPubKey))
-            {
+            // If the transaction is using SIGHASH_FORKID, we need to set the
+            // apropriate flags.
+            // TODO: Remove after the Hard Fork.
+            uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS;
+            if (sig.back() & SIGHASH_FORKID) {
+                flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
+            }
+
+            if (checker.CheckSig(sig, pubkey, scriptPubKey, flags)) {
                 sigs[pubkey] = sig;
                 break;
             }
@@ -282,7 +294,7 @@ class DummySignatureChecker : public BaseSignatureChecker
 public:
     DummySignatureChecker() {}
 
-    bool CheckSig(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode) const
+    bool CheckSig(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, uint32_t flags) const
     {
         return true;
     }

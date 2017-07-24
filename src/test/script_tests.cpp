@@ -5,6 +5,7 @@
 
 #include "data/script_invalid.json.h"
 #include "data/script_valid.json.h"
+#include "rpcserver.h"
 #include "transaction_utils.h"
 
 #include "core_io.h"
@@ -58,7 +59,7 @@ read_json(const std::string& jsondata)
 
 BOOST_FIXTURE_TEST_SUITE(script_tests, BasicTestingSetup)
 
-CMutableTransaction BuildCreditingTransaction(const CScript& scriptPubKey)
+CMutableTransaction BuildCreditingTransaction(const CScript& scriptPubKey, CAmount amount = 0)
 {
     CMutableTransaction txCredit;
     txCredit.nVersion = 1;
@@ -69,7 +70,7 @@ CMutableTransaction BuildCreditingTransaction(const CScript& scriptPubKey)
     txCredit.vin[0].scriptSig = CScript() << CScriptNum(0) << CScriptNum(0);
     txCredit.vin[0].nSequence = CTxIn::SEQUENCE_FINAL;
     txCredit.vout[0].scriptPubKey = scriptPubKey;
-    txCredit.vout[0].nValue = 0;
+    txCredit.vout[0].nValue = amount;
 
     return txCredit;
 }
@@ -86,18 +87,17 @@ CMutableTransaction BuildSpendingTransaction(const CScript& scriptSig, const CMu
     txSpend.vin[0].scriptSig = scriptSig;
     txSpend.vin[0].nSequence = CTxIn::SEQUENCE_FINAL;
     txSpend.vout[0].scriptPubKey = CScript();
-    txSpend.vout[0].nValue = 0;
+    txSpend.vout[0].nValue = txCredit.vout[0].nValue;
 
     return txSpend;
 }
 
-void DoTest(const CScript& scriptPubKey, const CScript& scriptSig, int flags, bool expect, const std::string& message)
+void DoTest(const CScript& scriptPubKey, const CScript& scriptSig, int flags, bool expect, const std::string& message, CAmount nValue)
 {
     ScriptError err;
-    CMutableTransaction tx = BuildSpendingTransaction(scriptSig, BuildCreditingTransaction(scriptPubKey));
+    CMutableTransaction tx = BuildSpendingTransaction(scriptSig, BuildCreditingTransaction(scriptPubKey, nValue));
     CMutableTransaction tx2 = tx;
-    const CAmount amountZero = 0;
-    BOOST_CHECK_MESSAGE(VerifyScript(scriptSig, scriptPubKey, flags, MutableTransactionSignatureChecker(&tx, 0, amountZero), &err) == expect, message);
+    BOOST_CHECK_MESSAGE(VerifyScript(scriptSig, scriptPubKey, flags, MutableTransactionSignatureChecker(&tx, 0, nValue), &err) == expect, message);
     BOOST_CHECK_MESSAGE(expect == (err == SCRIPT_ERR_OK), std::string(ScriptErrorString(err)) + ": " + message);
 #if defined(HAVE_CONSENSUS_LIB)
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
@@ -192,6 +192,7 @@ private:
     std::vector<unsigned char> push;
     std::string comment;
     int flags;
+    CAmount nValue;
 
     void DoPush()
     {
@@ -209,12 +210,13 @@ private:
     }
 
 public:
-    TestBuilder(const CScript& redeemScript, const std::string& comment_, int flags_, bool P2SH = false) : scriptPubKey(redeemScript), havePush(false), comment(comment_), flags(flags_)
+    TestBuilder(const CScript& redeemScript, const std::string& comment_, int flags_, bool P2SH = false, CAmount nValue_ = 0)
+        : scriptPubKey(redeemScript), havePush(false), comment(comment_), flags(flags_), nValue(nValue_)
     {
         if (P2SH) {
-            creditTx = BuildCreditingTransaction(CScript() << OP_HASH160 << ToByteVector(CScriptID(redeemScript)) << OP_EQUAL);
+            creditTx = BuildCreditingTransaction(CScript() << OP_HASH160 << ToByteVector(CScriptID(redeemScript)) << OP_EQUAL, nValue);
         } else {
-            creditTx = BuildCreditingTransaction(redeemScript);
+            creditTx = BuildCreditingTransaction(redeemScript, nValue);
         }
         spendTx = BuildSpendingTransaction(CScript(), creditTx);
     }
@@ -239,10 +241,9 @@ public:
         return *this;
     }
 
-    TestBuilder& PushSig(const CKey& key, int nHashType = SIGHASH_ALL, unsigned int lenR = 32, unsigned int lenS = 32)
+    TestBuilder& PushSig(const CKey& key, int nHashType = SIGHASH_ALL, unsigned int lenR = 32, unsigned int lenS = 32, CAmount amount = 0)
     {
-        const CAmount amountZero = 0;
-        uint256 hash = SignatureHash(scriptPubKey, spendTx, 0, amountZero, nHashType);
+        uint256 hash = SignatureHash(scriptPubKey, spendTx, 0, amount, nHashType);
         std::vector<unsigned char> vchSig, r, s;
         uint32_t iter = 0;
         do {
@@ -294,7 +295,7 @@ public:
     {
         TestBuilder copy = *this; // Make a copy so we can rollback the push.
         DoPush();
-        DoTest(creditTx.vout[0].scriptPubKey, spendTx.vin[0].scriptSig, flags, expect, comment);
+        DoTest(creditTx.vout[0].scriptPubKey, spendTx.vin[0].scriptSig, flags, expect, comment, nValue);
         *this = copy;
         return *this;
     }
@@ -303,6 +304,12 @@ public:
     {
         DoPush();
         UniValue array(UniValue::VARR);
+        if (nValue != 0) {
+            UniValue amount(UniValue::VARR);
+            amount.push_back(ValueFromAmount(nValue));
+            array.push_back(amount);
+        }
+
         array.push_back(TxUtils::FormatScript(spendTx.vin[0].scriptSig));
         array.push_back(TxUtils::FormatScript(creditTx.vout[0].scriptPubKey));
         array.push_back(FormatScriptFlags(flags));
@@ -581,6 +588,15 @@ BOOST_AUTO_TEST_CASE(script_build)
                                "P2SH with CLEANSTACK", SCRIPT_VERIFY_CLEANSTACK | SCRIPT_VERIFY_P2SH, true
                               ).PushSig(keys.key0).PushRedeem());
 
+    static const CAmount TEST_AMOUNT = 12345000000000;
+    good.push_back(TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG, "P2PK FORKID", SCRIPT_ENABLE_SIGHASH_FORKID, false, TEST_AMOUNT)
+                    .PushSig(keys.key0, SIGHASH_ALL | SIGHASH_FORKID, 32, 32, TEST_AMOUNT));
+
+    bad.push_back(TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG, "P2PK INVALID AMOUNT", SCRIPT_ENABLE_SIGHASH_FORKID, false, TEST_AMOUNT)
+                    .PushSig(keys.key0, SIGHASH_ALL | SIGHASH_FORKID, 32, 32, TEST_AMOUNT + 1));
+
+    bad.push_back(TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG, "P2PK INVALID FORKID", SCRIPT_VERIFY_STRICTENC, false, TEST_AMOUNT)
+                    .PushSig(keys.key0, SIGHASH_ALL | SIGHASH_FORKID, 32, 32, TEST_AMOUNT));
 
     std::set<std::string> tests_good;
     std::set<std::string> tests_bad;
@@ -645,20 +661,26 @@ BOOST_AUTO_TEST_CASE(script_valid)
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
         UniValue test = tests[idx];
         string strTest = test.write();
-        if (test.size() < 3) // Allow size > 3; extra stuff ignored (useful for comments)
+        CAmount nValue = 0;
+        unsigned int pos = 0;
+        if (test.size() > 0 && test[pos].isArray()) {
+            nValue = AmountFromValue(test[pos][0]);
+            pos++;
+        }
+        if (test.size() < 3 + pos) // Allow size > 3; extra stuff ignored (useful for comments)
         {
             if (test.size() != 1) {
                 BOOST_ERROR("Bad test: " << strTest);
             }
             continue;
         }
-        string scriptSigString = test[0].get_str();
+        string scriptSigString = test[pos++].get_str();
         CScript scriptSig = ParseScript(scriptSigString);
-        string scriptPubKeyString = test[1].get_str();
+        string scriptPubKeyString = test[pos++].get_str();
         CScript scriptPubKey = ParseScript(scriptPubKeyString);
-        unsigned int scriptflags = ParseScriptFlags(test[2].get_str());
+        unsigned int scriptflags = ParseScriptFlags(test[pos++].get_str());
 
-        DoTest(scriptPubKey, scriptSig, scriptflags, true, strTest);
+        DoTest(scriptPubKey, scriptSig, scriptflags, true, strTest, nValue);
     }
 }
 
@@ -670,20 +692,26 @@ BOOST_AUTO_TEST_CASE(script_invalid)
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
         UniValue test = tests[idx];
         string strTest = test.write();
-        if (test.size() < 3) // Allow size > 2; extra stuff ignored (useful for comments)
+        CAmount nValue = 0;
+        unsigned int pos = 0;
+        if (test.size() > 0 && test[pos].isArray()) {
+            nValue = AmountFromValue(test[pos][0]);
+            pos++;
+        }
+        if (test.size() < 3 + pos) // Allow size > 2; extra stuff ignored (useful for comments)
         {
             if (test.size() != 1) {
                 BOOST_ERROR("Bad test: " << strTest);
             }
             continue;
         }
-        string scriptSigString = test[0].get_str();
+        string scriptSigString = test[pos++].get_str();
         CScript scriptSig = ParseScript(scriptSigString);
-        string scriptPubKeyString = test[1].get_str();
+        string scriptPubKeyString = test[pos++].get_str();
         CScript scriptPubKey = ParseScript(scriptPubKeyString);
-        unsigned int scriptflags = ParseScriptFlags(test[2].get_str());
+        unsigned int scriptflags = ParseScriptFlags(test[pos++].get_str());
 
-        DoTest(scriptPubKey, scriptSig, scriptflags, false, strTest);
+        DoTest(scriptPubKey, scriptSig, scriptflags, false, strTest, nValue);
     }
 }
 
@@ -1019,6 +1047,13 @@ BOOST_AUTO_TEST_CASE(script_GetScriptAsm)
     BOOST_CHECK_EQUAL(derSig + "81 " + pubKey, ScriptToAsmStr(CScript() << ToByteVector(ParseHex(derSig + "81")) << vchPubKey));
     BOOST_CHECK_EQUAL(derSig + "82 " + pubKey, ScriptToAsmStr(CScript() << ToByteVector(ParseHex(derSig + "82")) << vchPubKey));
     BOOST_CHECK_EQUAL(derSig + "83 " + pubKey, ScriptToAsmStr(CScript() << ToByteVector(ParseHex(derSig + "83")) << vchPubKey));
+
+    BOOST_CHECK_EQUAL(derSig + "[NONE|FORKID] " + pubKey, ScriptToAsmStr(CScript() << ToByteVector(ParseHex(derSig + "42")) << vchPubKey, true));
+    BOOST_CHECK_EQUAL(derSig + "[NONE|ANYONECANPAY|FORKID] " + pubKey, ScriptToAsmStr(CScript() << ToByteVector(ParseHex(derSig + "c2")) << vchPubKey, true));
+    BOOST_CHECK_EQUAL(derSig + "[SINGLE] " + pubKey, ScriptToAsmStr(CScript() << ToByteVector(ParseHex(derSig + "03")) << vchPubKey, true));
+    BOOST_CHECK_EQUAL(derSig + "[SINGLE|ANYONECANPAY] " + pubKey, ScriptToAsmStr(CScript() << ToByteVector(ParseHex(derSig + "83")) << vchPubKey, true));
+    BOOST_CHECK_EQUAL(derSig + "[SINGLE|FORKID] " + pubKey, ScriptToAsmStr(CScript() << ToByteVector(ParseHex(derSig + "43")) << vchPubKey, true));
+    BOOST_CHECK_EQUAL(derSig + "[SINGLE|ANYONECANPAY|FORKID] " + pubKey, ScriptToAsmStr(CScript() << ToByteVector(ParseHex(derSig + "c3")) << vchPubKey, true));
 }
 
 BOOST_AUTO_TEST_CASE(transactionV4)

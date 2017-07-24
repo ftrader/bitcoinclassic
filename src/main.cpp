@@ -1101,9 +1101,13 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
             return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false, errString);
         }
 
+        uint32_t scriptVerifyFlags = STANDARD_SCRIPT_VERIFY_FLAGS;
+        if (Application::uahfChainState() >= Application::UAHFRulesActive)
+            scriptVerifyFlags |= SCRIPT_ENABLE_SIGHASH_FORKID;
+
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
-        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS, true))
+        if (!CheckInputs(tx, state, view, true, scriptVerifyFlags, true))
             return false;
 
         // Check again against just the consensus-critical mandatory script
@@ -1115,7 +1119,11 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
         // There is a similar check in CreateNewBlock() to prevent creating
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
-        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true))
+        scriptVerifyFlags = MANDATORY_SCRIPT_VERIFY_FLAGS;
+        if (Application::uahfChainState() >= Application::UAHFRulesActive)
+            scriptVerifyFlags |= SCRIPT_ENABLE_SIGHASH_FORKID;
+
+        if (!CheckInputs(tx, state, view, true, scriptVerifyFlags, true))
         {
             return error("%s: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s, %s",
                 __func__, hash.ToString(), FormatStateMessage(state));
@@ -2040,6 +2048,14 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         flags |= SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
         nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
     }
+
+    if ((Application::uahfChainState() == Application::UAHFWaiting
+         && pindex->GetMedianTimePast() >= Application::uahfStartTime())
+            || Application::uahfChainState() == Application::UAHFRulesActive) {
+        flags |= SCRIPT_VERIFY_STRICTENC;
+        flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
+    }
+
 
     int64_t nTime2 = GetTimeMicros(); nTimeForks += nTime2 - nTime1;
     LogPrint("bench", "    - Fork checks: %.2fms [%.2fs]\n", 0.001 * (nTime2 - nTime1), nTimeForks * 0.000001);

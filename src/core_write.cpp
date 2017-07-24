@@ -1,6 +1,21 @@
+/*
+ * This file is part of the bitcoin-classic project
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+ * Copyright (C) 2017 Tom Zander <tomz@freedommail.ch>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "core_io.h"
 
@@ -60,10 +75,19 @@ std::string ScriptToAsmStr(const CScript& script, const bool fAttemptSighashDeco
                     // this won't decode correctly formatted public keys in Pubkey or Multisig scripts due to
                     // the restrictions on the pubkey formats (see IsCompressedOrUncompressedPubKey) being incongruous with the
                     // checks in CheckSignatureEncoding.
-                    if (CheckSignatureEncoding(vch, SCRIPT_VERIFY_STRICTENC, NULL)) {
-                        const unsigned char chSigHashType = vch.back();
+                    uint32_t flags = SCRIPT_VERIFY_STRICTENC;
+                    if (vch.back() & SIGHASH_FORKID) {
+                        // If the transaction is using SIGHASH_FORKID, we need
+                        // to set the apropriate flag.
+                        // TODO: Remove after the Hard Fork.
+                        flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
+                    }
+                    if (CheckSignatureEncoding(vch, flags, NULL)) {
+                        const uint8_t chSigHashType = vch.back() &  0xBF;
                         if (mapSigHashTypes.count(chSigHashType)) {
-                            strSigHashDecode = "[" + mapSigHashTypes.find(chSigHashType)->second + "]";
+                            const bool forkIdSet = (vch.back() & SIGHASH_FORKID) == SIGHASH_FORKID;
+                            strSigHashDecode = "[" + mapSigHashTypes.find(chSigHashType)->second
+                                    + (forkIdSet ? "|FORKID]" : "]");
                             vch.pop_back(); // remove the sighash type byte. it will be replaced by the decode.
                         }
                     }

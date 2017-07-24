@@ -24,6 +24,7 @@ enum
     SIGHASH_ALL = 1,
     SIGHASH_NONE = 2,
     SIGHASH_SINGLE = 3,
+    SIGHASH_FORKID = 0x40,
     SIGHASH_ANYONECANPAY = 0x80,
 };
 
@@ -86,16 +87,20 @@ enum
     //
     // See BIP112 for details
     SCRIPT_VERIFY_CHECKSEQUENCEVERIFY = (1U << 10),
+
+    // Do we accept signature using SIGHASH_FORKID
+    //
+    SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError* serror);
 
-uint256 SignatureHash(const CScript &scriptCode, const CTransaction& txTo, unsigned int nIn, CAmount amount, int nHashType);
+uint256 SignatureHash(const CScript &scriptCode, const CTransaction& txTo, unsigned int nIn, CAmount amount, int nHashType, uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID);
 
 class BaseSignatureChecker
 {
 public:
-    virtual bool CheckSig(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode) const
+    virtual bool CheckSig(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, uint32_t flags) const
     {
         return false;
     }
@@ -125,7 +130,7 @@ protected:
 
 public:
     TransactionSignatureChecker(const CTransaction* txToIn, unsigned int nInIn, const CAmount& amountIn) : txTo(txToIn), nIn(nInIn), amount(amountIn) {}
-    bool CheckSig(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode) const;
+    bool CheckSig(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, uint32_t flags) const;
     bool CheckLockTime(const CScriptNum& nLockTime) const;
     bool CheckSequence(const CScriptNum& nSequence) const;
 };
