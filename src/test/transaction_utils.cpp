@@ -47,7 +47,7 @@ void TxUtils::RandomTransaction(CMutableTransaction &tx, RandomTransactionType s
         txin.prevout.hash = GetRandHash();
         txin.prevout.n = insecure_rand() % 4;
         RandomInScript(txin.scriptSig);
-        txin.nSequence = (insecure_rand() % 2) ? (insecure_rand() & 0x40FFFF) : (unsigned int)-1;
+        txin.nSequence = (unsigned int)-1;
     }
     for (int out = 0; out < outs; out++) {
         tx.vout.push_back(CTxOut());
