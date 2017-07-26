@@ -96,6 +96,7 @@ void Application::init()
     else
         m_uahfState = UAHFWaiting; // will be updated when the blocks-db is parsed.
 
+    logInfo(8002) << "UAHF state:" << m_uahfState << "start time:" << m_uahfStartTme;
 }
 
 Application::~Application()
@@ -178,6 +179,7 @@ Application::UAHFState Application::uahfChainState()
 
 void Application::setUahfChainState(Application::UAHFState state)
 {
+    logInfo(8002) << "Set UAHF:" << state;
     Application::instance()->m_uahfState = state;
 }
 

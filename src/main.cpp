@@ -2052,6 +2052,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if ((Application::uahfChainState() == Application::UAHFWaiting
          && pindex->GetMedianTimePast() >= Application::uahfStartTime())
             || Application::uahfChainState() == Application::UAHFRulesActive) {
+        logInfo(8002) << "Connect block" << pindex->nHeight << "validating based on the idea that UAHF rules are active.";
         flags |= SCRIPT_VERIFY_STRICTENC;
         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
     }
@@ -2216,6 +2217,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         logWarning() << "ConnectBlock connected the last block in the old chain, UAHF rules from now on only. Emptying mempool";
         mempool.clear();
     } else if (Application::uahfChainState() == Application::UAHFRulesActive && pindex->pprev->GetMedianTimePast() >= Application::uahfStartTime()) {
+        logInfo(8002) << "UAHF block found that activates the chain" << block.GetHash();
         // enable UAHF (aka BCC) on first block after the calculated timestamp
         Blocks::DB::instance()->setUahfForkBlock(block.GetHash()); // this will update Application::uahfChainState
     }
@@ -3156,8 +3158,10 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
         const int64_t startTime = Application::uahfStartTime();
         if (pindexPrev->GetMedianTimePast() >= startTime) {
             // this is a UAHF-chain block!
+            logInfo(8002) << "Check block found an UAHF chain block (based on timestamp)" << pindexPrev->nHeight + 1 << block.GetHash();
 
             if (pindexPrev->pprev->GetMedianTimePast() < startTime) {
+                logInfo(8002) << " + block is the anti-rollback block!" << pindexPrev->nHeight + 1 << "size:" << blockSize;
                 // If UAHF is enabled for the curent block, but not for the previous
                 // block, we must check that the block is larger than 1MB.
                  if (blockSize <= MAX_BLOCK_SIZE)
@@ -3168,6 +3172,7 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
                 for (const CTransaction &tx : block.vtx) {
                     for (const CTxOut &o : tx.vout) {
                         if (o.scriptPubKey.isCommitment(consensusParams.antiReplayOpReturnCommitment)) {
+                            logInfo(8002) << " + mined block includes the OP_RETURN forbidden string, rejecting";
                             return state.DoS(10, false, REJECT_INVALID, "bad-txn-replay",
                                              false, "non playable transaction");
                         }

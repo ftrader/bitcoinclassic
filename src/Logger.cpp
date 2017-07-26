@@ -69,6 +69,7 @@ Log::Manager::Manager()
     d->sectionNames.emplace(Log::Internals, "Internals");
     d->sectionNames.emplace(Log::Mempool, "Mempool");
     d->sectionNames.emplace(Log::Random, "Random");
+    d->sectionNames.emplace(8002, "UAHF");
 
     // this is purely to be backwards compatible with the old style where the section was a string.
     d->categoryMapping.emplace("bench", Log::Bench);
