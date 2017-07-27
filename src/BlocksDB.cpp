@@ -374,6 +374,12 @@ bool Blocks::DB::CacheAllBlockInfos()
     if (Application::uahfChainState() != Application::UAHFDisabled) {
         Read(DB_UAHF_FORK_BLOCK, d->uahfStartBlock);
         setUahfForkBlock(d->uahfStartBlock);
+
+        if (Application::uahfChainState() != Application::UAHFActive) {
+            auto bi = chainActive.Tip();
+            if (bi && bi->GetMedianTimePast() >= Application::uahfStartTime())
+                    Application::setUahfChainState(Application::UAHFRulesActive);
+        }
     }
 
     return true;
@@ -475,7 +481,8 @@ bool Blocks::DB::setUahfForkBlock(const uint256 &blockId)
         auto mi = Blocks::indexMap.find(d->uahfStartBlock);
         if (mi != Blocks::indexMap.end()) {
             const CBlockIndex *bi = mi->second;
-            if (bi->nTime > Application::uahfStartTime() && headerChain().Contains(bi))
+            assert(bi);
+            if (bi->pprev && bi->pprev->GetMedianTimePast() >= Application::uahfStartTime() && headerChain().Contains(bi))
                 Application::setUahfChainState(Application::UAHFActive);
         }
     }

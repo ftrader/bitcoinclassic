@@ -1971,11 +1971,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     }
     assert(pindex->pprev);
 
-    // enable UAHF (aka BCC) on first block after the calculated timestamp
-    if (!fJustCheck && Application::uahfChainState() == Application::UAHFWaiting
-            && pindex->pprev->GetMedianTimePast() >= Application::uahfStartTime())
-        Blocks::DB::instance()->setUahfForkBlock(block.GetHash()); // this will update Application::uahfChainState
-
     const int64_t timeBarrier = GetTime() - 24 * 3600 * std::max(1, nScriptCheckThreads);
     // Blocks that have varius days of POW behind them makes them secure in
     // that actually online nodes checked the scripts, so during initial sync we
@@ -2198,6 +2193,17 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     int64_t nTime6 = GetTimeMicros(); nTimeCallbacks += nTime6 - nTime5;
     LogPrint("bench", "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime6 - nTime5), nTimeCallbacks * 0.000001);
+
+    if (Application::uahfChainState() == Application::UAHFWaiting && pindex->GetMedianTimePast() >= Application::uahfStartTime()) {
+        Application::setUahfChainState(Application::UAHFRulesActive);
+        // next block is the big, fork-block.
+        logWarning() << "ConnectBlock connected the last block in the old chain, UAHF rules from now on only. Emptying mempool";
+        mempool.clear();
+    } else if (Application::uahfChainState() == Application::UAHFRulesActive && pindex->pprev->GetMedianTimePast() >= Application::uahfStartTime()) {
+        // enable UAHF (aka BCC) on first block after the calculated timestamp
+        Blocks::DB::instance()->setUahfForkBlock(block.GetHash()); // this will update Application::uahfChainState
+    }
+
 
     return true;
 }

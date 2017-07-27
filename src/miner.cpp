@@ -155,8 +155,7 @@ CBlockTemplate* Mining::CreateNewBlock(const CChainParams& chainparams) const
         LOCK2(cs_main, mempool.cs);
         CBlockIndex* pindexPrev = chainActive.Tip();
 
-        if (Application::uahfChainState() == Application::UAHFWaiting
-                && pindexPrev->GetMedianTimePast() < Application::uahfStartTime()) { // we are not allowed to mine over 1MB yet.
+        if (Application::uahfChainState() == Application::UAHFWaiting) { // we are not allowed to mine over 1MB yet.
             nBlockMaxSize = std::min<uint32_t>(1000000, nBlockMaxSize);
             nBlockMinSize = std::min<uint32_t>(nBlockMaxSize, nBlockMinSize);
         }

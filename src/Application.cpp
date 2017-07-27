@@ -97,7 +97,7 @@ void Application::init()
     if (m_uahfStartTme == 0)
         m_uahfState = UAHFDisabled;
     else
-        m_uahfState = UAHFWaiting; // will be updated when the chain is parsed.
+        m_uahfState = UAHFWaiting; // will be updated when the blocks-db is parsed.
 
 }
 

@@ -43,6 +43,7 @@ public:
     enum UAHFState {
         UAHFDisabled,
         UAHFWaiting,
+        UAHFRulesActive, //< We have not seen the big block yet, but we can't accept old style transactions anymore.
         UAHFActive
     };
 

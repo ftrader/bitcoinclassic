@@ -102,10 +102,19 @@ BOOST_AUTO_TEST_CASE(Test_Enabling)
     BOOST_CHECK(Blocks::DB::instance()->uahfForkBlock() == uint256());
     BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFWaiting);
 
-    uint256 hash;
-    createBlockIndex(Blocks::indexMap.begin()->second, 1, 18000, &hash);
+    // we use the MTP, which uses 11 blocks, so make sure we actually have those
+    // and they say exactly what we want them to say.
+    std::vector<uint256> hashes;
+    hashes.resize(12);
+    // create 20 block-indexes.
+    CBlockIndex *tip = Blocks::indexMap.begin()->second;
+    for (int i = 0; i < 12; ++i) {
+        tip = createBlockIndex(tip, i + 1, 20000 + i * 100, &hashes[i]);
+    }
+    chainActive.SetTip(tip);
+    // tip GMTP is 20600, the one before 20500
 
-    Blocks::DB::instance()->setUahfForkBlock(hash);
+    Blocks::DB::instance()->setUahfForkBlock(hashes[11]);
     BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFActive);
 
     mapArgs["-uahfstarttime"] = "0";
@@ -118,14 +127,28 @@ BOOST_AUTO_TEST_CASE(Test_Enabling)
     MockApplication::doInit();
     Blocks::DB::createInstance(0, false);
     Blocks::DB::instance()->CacheAllBlockInfos();
-    BOOST_CHECK(Blocks::DB::instance()->uahfForkBlock() == hash);
+    BOOST_CHECK(Blocks::DB::instance()->uahfForkBlock() == hashes[11]);
     BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFActive);
 
-    mapArgs["-uahfstarttime"] = "18001"; // TODO check if this should be 18000 instead
+    mapArgs["-uahfstarttime"] = "20500";
     MockApplication::doInit();
     Blocks::DB::createInstance(0, false);
     Blocks::DB::instance()->CacheAllBlockInfos();
-    BOOST_CHECK(Blocks::DB::instance()->uahfForkBlock() == hash);
+    BOOST_CHECK(Blocks::DB::instance()->uahfForkBlock() == hashes[11]);
+    BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFActive);
+
+    mapArgs["-uahfstarttime"] = "20600";
+    MockApplication::doInit();
+    Blocks::DB::createInstance(0, false);
+    Blocks::DB::instance()->CacheAllBlockInfos();
+    BOOST_CHECK(Blocks::DB::instance()->uahfForkBlock() == hashes[11]);
+    BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFRulesActive);
+
+    mapArgs["-uahfstarttime"] = "20601";
+    MockApplication::doInit();
+    Blocks::DB::createInstance(0, false);
+    Blocks::DB::instance()->CacheAllBlockInfos();
+    BOOST_CHECK(Blocks::DB::instance()->uahfForkBlock() == hashes[11]);
     BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFWaiting);
 }
 
