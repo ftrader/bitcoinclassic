@@ -30,9 +30,6 @@
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 
-// if enabled, this client defaults the fork on.
-#define UAHF_CLIENT 1
-
 // static
 Application * Application::instance()
 {
@@ -89,7 +86,7 @@ void Application::init()
     }
 
     m_uahfStartTme = std::max<int64_t>(0, GetArg("-uahfstarttime",
-#ifdef UAHF_CLIENT
+#if UAHF_CLIENT
                                    1501590000));
 #else
                                    0));
