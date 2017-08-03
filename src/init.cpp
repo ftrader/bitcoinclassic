@@ -924,7 +924,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                     break;
                 }
             } catch (const std::exception& e) {
-                if (fDebug) LogPrintf("%s\n", e.what());
+                logWarning() << e;
                 strLoadError = _("Error opening block database");
                 break;
             }
