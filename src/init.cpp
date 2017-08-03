@@ -821,126 +821,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     } // (!fDisableWallet)
 #endif // ENABLE_WALLET
-    // ********************************************************* Step 6: network initialization
 
-    CTxOrphanCache::instance()->setLimit((unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS)));
 
-    RegisterNodeSignals(GetNodeSignals());
-
-    if (mapArgs.count("-onlynet")) {
-        std::set<CNetAddr::Network> nets;
-        BOOST_FOREACH(const std::string& snet, mapMultiArgs["-onlynet"]) {
-            CNetAddr::Network net = ParseNetwork(snet);
-            if (net == CNetAddr::NET_UNROUTABLE)
-                return InitError(strprintf(_("Unknown network specified in -onlynet: '%s'"), snet));
-            nets.insert(net);
-        }
-        for (int n = 0; n < CNetAddr::NET_MAX; n++) {
-            CNetAddr::Network net = (CNetAddr::Network)n;
-            if (!nets.count(net))
-                SetLimited(net);
-        }
-    }
-
-    if (mapArgs.count("-whitelist")) {
-        BOOST_FOREACH(const std::string& net, mapMultiArgs["-whitelist"]) {
-            CSubNet subnet(net);
-            if (!subnet.IsValid())
-                return InitError(strprintf(_("Invalid netmask specified in -whitelist: '%s'"), net));
-            CNode::AddWhitelistedRange(subnet);
-        }
-    }
-
-    bool proxyRandomize = GetBoolArg("-proxyrandomize", DEFAULT_PROXYRANDOMIZE);
-    // -proxy sets a proxy for all outgoing network traffic
-    // -noproxy (or -proxy=0) as well as the empty string can be used to not set a proxy, this is the default
-    std::string proxyArg = GetArg("-proxy", "");
-    SetLimited(CNetAddr::NET_TOR);
-    if (proxyArg != "" && proxyArg != "0") {
-        proxyType addrProxy = proxyType(CService(proxyArg, 9050), proxyRandomize);
-        if (!addrProxy.IsValid())
-            return InitError(strprintf(_("Invalid -proxy address: '%s'"), proxyArg));
-
-        SetProxy(CNetAddr::NET_IPV4, addrProxy);
-        SetProxy(CNetAddr::NET_IPV6, addrProxy);
-        SetProxy(CNetAddr::NET_TOR, addrProxy);
-        SetNameProxy(addrProxy);
-        SetLimited(CNetAddr::NET_TOR, false); // by default, -proxy sets onion as reachable, unless -noonion later
-    }
-
-    // -onion can be used to set only a proxy for .onion, or override normal proxy for .onion addresses
-    // -noonion (or -onion=0) disables connecting to .onion entirely
-    // An empty string is used to not override the onion proxy (in which case it defaults to -proxy set above, or none)
-    std::string onionArg = GetArg("-onion", "");
-    if (onionArg != "") {
-        if (onionArg == "0") { // Handle -noonion/-onion=0
-            SetLimited(CNetAddr::NET_TOR); // set onions as unreachable
-        } else {
-            proxyType addrOnion = proxyType(CService(onionArg, 9050), proxyRandomize);
-            if (!addrOnion.IsValid())
-                return InitError(strprintf(_("Invalid -onion address: '%s'"), onionArg));
-            SetProxy(CNetAddr::NET_TOR, addrOnion);
-            SetLimited(CNetAddr::NET_TOR, false);
-        }
-    }
-
-    // see Step 2: parameter interactions for more information about these
-    fListen = GetBoolArg("-listen", DEFAULT_LISTEN);
-    fDiscover = GetBoolArg("-discover", true);
-    fNameLookup = GetBoolArg("-dns", DEFAULT_NAME_LOOKUP);
-
-    bool fBound = false;
-    if (fListen) {
-        if (mapArgs.count("-bind") || mapArgs.count("-whitebind")) {
-            BOOST_FOREACH(const std::string& strBind, mapMultiArgs["-bind"]) {
-                CService addrBind;
-                if (!Lookup(strBind.c_str(), addrBind, GetListenPort(), false))
-                    return InitError(strprintf(_("Cannot resolve -bind address: '%s'"), strBind));
-                fBound |= Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR));
-            }
-            BOOST_FOREACH(const std::string& strBind, mapMultiArgs["-whitebind"]) {
-                CService addrBind;
-                if (!Lookup(strBind.c_str(), addrBind, 0, false))
-                    return InitError(strprintf(_("Cannot resolve -whitebind address: '%s'"), strBind));
-                if (addrBind.GetPort() == 0)
-                    return InitError(strprintf(_("Need to specify a port with -whitebind: '%s'"), strBind));
-                fBound |= Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR | BF_WHITELIST));
-            }
-        }
-        else {
-            struct in_addr inaddr_any;
-            inaddr_any.s_addr = INADDR_ANY;
-            fBound |= Bind(CService(in6addr_any, GetListenPort()), BF_NONE);
-            fBound |= Bind(CService(inaddr_any, GetListenPort()), !fBound ? BF_REPORT_ERROR : BF_NONE);
-        }
-        if (!fBound)
-            return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
-    }
-
-    if (mapArgs.count("-externalip")) {
-        BOOST_FOREACH(const std::string& strAddr, mapMultiArgs["-externalip"]) {
-            CService addrLocal(strAddr, GetListenPort(), fNameLookup);
-            if (!addrLocal.IsValid())
-                return InitError(strprintf(_("Cannot resolve -externalip address: '%s'"), strAddr));
-            AddLocal(CService(strAddr, GetListenPort(), fNameLookup), LOCAL_MANUAL);
-        }
-    }
-
-    BOOST_FOREACH(const std::string& strDest, mapMultiArgs["-seednode"])
-        AddOneShot(strDest);
-
-#if ENABLE_ZMQ
-    pzmqNotificationInterface = CZMQNotificationInterface::CreateWithArguments(mapArgs);
-
-    if (pzmqNotificationInterface) {
-        RegisterValidationInterface(pzmqNotificationInterface);
-    }
-#endif
-    if (mapArgs.count("-maxuploadtarget")) {
-        CNode::SetMaxOutboundTarget(GetArg("-maxuploadtarget", DEFAULT_MAX_UPLOAD_TARGET)*1024*1024);
-    }
-
-    // ********************************************************* Step 7: load block chain
+    // ********************************************************* Step 6: load block chain
 
     bool fReindex = GetBoolArg("-reindex", false);
 
@@ -1087,6 +970,135 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (!est_filein.IsNull())
         mempool.ReadFeeEstimates(est_filein);
     fFeeEstimatesInitialized = true;
+
+
+    // ********************************************************* Step 7: network initialization
+
+    CTxOrphanCache::instance()->setLimit((unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS)));
+
+    RegisterNodeSignals(GetNodeSignals());
+
+    if (mapArgs.count("-onlynet")) {
+        std::set<CNetAddr::Network> nets;
+        BOOST_FOREACH(const std::string& snet, mapMultiArgs["-onlynet"]) {
+            CNetAddr::Network net = ParseNetwork(snet);
+            if (net == CNetAddr::NET_UNROUTABLE)
+                return InitError(strprintf(_("Unknown network specified in -onlynet: '%s'"), snet));
+            nets.insert(net);
+        }
+        for (int n = 0; n < CNetAddr::NET_MAX; n++) {
+            CNetAddr::Network net = (CNetAddr::Network)n;
+            if (!nets.count(net))
+                SetLimited(net);
+        }
+    }
+
+    if (mapArgs.count("-whitelist")) {
+        BOOST_FOREACH(const std::string& net, mapMultiArgs["-whitelist"]) {
+            CSubNet subnet(net);
+            if (!subnet.IsValid())
+                return InitError(strprintf(_("Invalid netmask specified in -whitelist: '%s'"), net));
+            CNode::AddWhitelistedRange(subnet);
+        }
+    }
+
+    bool proxyRandomize = GetBoolArg("-proxyrandomize", DEFAULT_PROXYRANDOMIZE);
+    // -proxy sets a proxy for all outgoing network traffic
+    // -noproxy (or -proxy=0) as well as the empty string can be used to not set a proxy, this is the default
+    std::string proxyArg = GetArg("-proxy", "");
+    SetLimited(CNetAddr::NET_TOR);
+    if (proxyArg != "" && proxyArg != "0") {
+        proxyType addrProxy = proxyType(CService(proxyArg, 9050), proxyRandomize);
+        if (!addrProxy.IsValid())
+            return InitError(strprintf(_("Invalid -proxy address: '%s'"), proxyArg));
+
+        SetProxy(CNetAddr::NET_IPV4, addrProxy);
+        SetProxy(CNetAddr::NET_IPV6, addrProxy);
+        SetProxy(CNetAddr::NET_TOR, addrProxy);
+        SetNameProxy(addrProxy);
+        SetLimited(CNetAddr::NET_TOR, false); // by default, -proxy sets onion as reachable, unless -noonion later
+    }
+
+    // -onion can be used to set only a proxy for .onion, or override normal proxy for .onion addresses
+    // -noonion (or -onion=0) disables connecting to .onion entirely
+    // An empty string is used to not override the onion proxy (in which case it defaults to -proxy set above, or none)
+    std::string onionArg = GetArg("-onion", "");
+    if (onionArg != "") {
+        if (onionArg == "0") { // Handle -noonion/-onion=0
+            SetLimited(CNetAddr::NET_TOR); // set onions as unreachable
+        } else {
+            proxyType addrOnion = proxyType(CService(onionArg, 9050), proxyRandomize);
+            if (!addrOnion.IsValid())
+                return InitError(strprintf(_("Invalid -onion address: '%s'"), onionArg));
+            SetProxy(CNetAddr::NET_TOR, addrOnion);
+            SetLimited(CNetAddr::NET_TOR, false);
+        }
+    }
+
+    // see Step 2: parameter interactions for more information about these
+    fListen = GetBoolArg("-listen", DEFAULT_LISTEN);
+    fDiscover = GetBoolArg("-discover", true);
+    fNameLookup = GetBoolArg("-dns", DEFAULT_NAME_LOOKUP);
+
+    bool fBound = false;
+    if (fListen) {
+        if (mapArgs.count("-bind") || mapArgs.count("-whitebind")) {
+            BOOST_FOREACH(const std::string& strBind, mapMultiArgs["-bind"]) {
+                CService addrBind;
+                if (!Lookup(strBind.c_str(), addrBind, GetListenPort(), false))
+                    return InitError(strprintf(_("Cannot resolve -bind address: '%s'"), strBind));
+                fBound |= Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR));
+            }
+            BOOST_FOREACH(const std::string& strBind, mapMultiArgs["-whitebind"]) {
+                CService addrBind;
+                if (!Lookup(strBind.c_str(), addrBind, 0, false))
+                    return InitError(strprintf(_("Cannot resolve -whitebind address: '%s'"), strBind));
+                if (addrBind.GetPort() == 0)
+                    return InitError(strprintf(_("Need to specify a port with -whitebind: '%s'"), strBind));
+                fBound |= Bind(addrBind, (BF_EXPLICIT | BF_REPORT_ERROR | BF_WHITELIST));
+            }
+        }
+        else {
+            struct in_addr inaddr_any;
+            inaddr_any.s_addr = INADDR_ANY;
+            fBound |= Bind(CService(in6addr_any, GetListenPort()), BF_NONE);
+            fBound |= Bind(CService(inaddr_any, GetListenPort()), !fBound ? BF_REPORT_ERROR : BF_NONE);
+        }
+        if (!fBound)
+            return InitError(_("Failed to listen on any port. Use -listen=0 if you want this."));
+    }
+
+    if (mapArgs.count("-externalip")) {
+        BOOST_FOREACH(const std::string& strAddr, mapMultiArgs["-externalip"]) {
+            CService addrLocal(strAddr, GetListenPort(), fNameLookup);
+            if (!addrLocal.IsValid())
+                return InitError(strprintf(_("Cannot resolve -externalip address: '%s'"), strAddr));
+            AddLocal(CService(strAddr, GetListenPort(), fNameLookup), LOCAL_MANUAL);
+        }
+    }
+
+    BOOST_FOREACH(const std::string& strDest, mapMultiArgs["-seednode"])
+        AddOneShot(strDest);
+
+#if ENABLE_ZMQ
+    pzmqNotificationInterface = CZMQNotificationInterface::CreateWithArguments(mapArgs);
+
+    if (pzmqNotificationInterface) {
+        RegisterValidationInterface(pzmqNotificationInterface);
+    }
+#endif
+    if (mapArgs.count("-maxuploadtarget")) {
+        CNode::SetMaxOutboundTarget(GetArg("-maxuploadtarget", DEFAULT_MAX_UPLOAD_TARGET)*1024*1024);
+    }
+
+
+
+
+
+
+
+
+
 
     // ********************************************************* Step 8: load wallet
 #ifdef ENABLE_WALLET
