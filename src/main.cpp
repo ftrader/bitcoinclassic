@@ -3645,6 +3645,7 @@ bool LoadBlockIndexDB()
                 }
             }
         }
+        Application::setUahfChainState(Application::UAHFRulesActive);
         if (needsRollback) {
             logCritical(8002) << "Detected your chain was not UAHF, will need to rollback to the fork-block!";
             if (forkHeight > 0) {
@@ -3655,20 +3656,20 @@ bool LoadBlockIndexDB()
                 uiInterface.InitMessage("Rolling back chain to UAHF-branch-point...");
             }
 
-            while (chainActive.Tip()->GetMedianTimePast() > Application::uahfStartTime()) {
+            while (chainActive.Height() > 12 && chainActive.Tip()->pprev->GetMedianTimePast() > Application::uahfStartTime()) {
                 logInfo(8002) << " reverting" << chainActive.Tip()->GetBlockHash() << chainActive.Tip()->nHeight;
                 CValidationState state;
                 bool ok = DisconnectTip(state, Params().GetConsensus());
                 if (!ok) {
-                    logFatal(8002) << "Failed to revert a block, likely due to a database error. This is fata;. Shutting down now";
-                    AbortNode(state, "Failed to revert a block, likely due to a database error. This is fata;. Shutting down now");
+                    logFatal(8002) << "Failed to revert a block, likely due to a database error. This is fatal;. Shutting down now";
+                    AbortNode(state, "Failed to revert a block, likely due to a database error. This is fatal;. Shutting down now");
                     return false;
                 }
                 if (ShutdownRequested())
                     return false;
+                mempool.clear();
             }
             // next block is the big, fork-block.
-            Application::setUahfChainState(Application::UAHFRulesActive);
             logInfo(8002) << "Waiting for fork block. UAHF rules active";
             pcoinsTip->Flush();
         }
