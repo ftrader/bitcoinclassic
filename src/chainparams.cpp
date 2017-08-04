@@ -138,16 +138,16 @@ public:
 
         const bool uahfEnabled = GetArg("-uahfstarttime", UAHF_CLIENT) > 0;
         if (uahfEnabled) {
+            vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "seed.bitcoinabc.org"));
+            vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "seed-abc.bitcoinforks.org"));
+            vSeeds.push_back(CDNSSeedData("bitprim.org", "seed.bitprim.org"));
+        } else {
             vSeeds.push_back(CDNSSeedData("bitcoin.sipa.be", "seed.bitcoin.sipa.be")); // Pieter Wuille
             vSeeds.push_back(CDNSSeedData("bluematt.me", "dnsseed.bluematt.me")); // Matt Corallo
             vSeeds.push_back(CDNSSeedData("dashjr.org", "dnsseed.bitcoin.dashjr.org")); // Luke Dashjr
             vSeeds.push_back(CDNSSeedData("bitcoinstats.com", "seed.bitcoinstats.com")); // Christian Decker
             vSeeds.push_back(CDNSSeedData("xf2.org", "bitseed.xf2.org")); // Jeff Garzik
             vSeeds.push_back(CDNSSeedData("bitcoin.jonasschnelli.ch", "seed.bitcoin.jonasschnelli.ch")); // Jonas Schnelli
-        } else {
-            vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "seed.bitcoinabc.org"));
-            vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "seed-abc.bitcoinforks.org"));
-            vSeeds.push_back(CDNSSeedData("bitprim.org", "seed.bitprim.org"));
         }
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,0);
@@ -247,14 +247,14 @@ public:
         vSeeds.clear();
         const bool uahfEnabled = GetArg("-uahfstarttime", UAHF_CLIENT) > 0;
         if (uahfEnabled) {
-            vSeeds.push_back(CDNSSeedData("bitcoin.petertodd.org", "testnet-seed.bitcoin.petertodd.org"));
-            vSeeds.push_back(CDNSSeedData("bluematt.me", "testnet-seed.bluematt.me"));
-            vSeeds.push_back(CDNSSeedData("bitcoin.schildbach.de", "testnet-seed.bitcoin.schildbach.de"));
-        } else {
             // nodes with support for servicebits filtering should be at the top
             vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "testnet-seed.bitcoinabc.org"));
             vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "testnet-seed-abc.bitcoinforks.org"));
             vSeeds.push_back(CDNSSeedData("bitprim.org", "testnet-seed.bitprim.org"));
+        } else {
+            vSeeds.push_back(CDNSSeedData("bitcoin.petertodd.org", "testnet-seed.bitcoin.petertodd.org"));
+            vSeeds.push_back(CDNSSeedData("bluematt.me", "testnet-seed.bluematt.me"));
+            vSeeds.push_back(CDNSSeedData("bitcoin.schildbach.de", "testnet-seed.bitcoin.schildbach.de"));
         }
 
 
