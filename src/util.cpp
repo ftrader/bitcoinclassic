@@ -299,7 +299,7 @@ boost::filesystem::path GetDefaultDataDir(bool useCashName)
         pathHome = fs::path(pszHome);
 #ifdef MAC_OSX
     // Mac
-    return pathHome / "Library/Application Support/Bitcoin";
+    return pathHome / "Library/Application Support" / dirName;
 #else
     // Unix
     fs::path pathLegacy = pathHome / (useCashName ? ".bitcoincash" : ".bitcoin");
