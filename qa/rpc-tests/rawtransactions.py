@@ -19,7 +19,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         initialize_chain_clean(self.options.tmpdir, 3)
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(3, self.options.tmpdir, [['-uahfstarttime=0']] * 3)
+        self.nodes = start_nodes(3, self.options.tmpdir)
 
         #connect to a local machine for debugging
         #url = "http://bitcoinrpc:DP6DvqZtqXarpeNWyN3LZTFchCCyCUuHwNF7E8pX99x1@%s:%d" % ('127.0.0.1', 18332)
@@ -122,7 +122,7 @@ class RawTransactionsTest(BitcoinTestFramework):
                 break
 
         bal = self.nodes[0].getbalance()
-        inputs = [{ "txid" : txId, "vout" : vout['n'], "scriptPubKey" : vout['scriptPubKey']['hex']}]
+        inputs = [{ "txid" : txId, "vout" : vout['n'], "scriptPubKey" : vout['scriptPubKey']['hex'], "amount" : vout['value']}]
         outputs = { self.nodes[0].getnewaddress() : 2.19 }
         rawTx = self.nodes[2].createrawtransaction(inputs, outputs)
         rawTxPartialSigned = self.nodes[1].signrawtransaction(rawTx, inputs)
