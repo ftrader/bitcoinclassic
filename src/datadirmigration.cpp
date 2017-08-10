@@ -181,30 +181,6 @@ void DatadirMigration::migrateToCashIfNeeded()
     config << "\nblockdatadir=" << from.string() << "\n";
     config.close();
 
-    // make sure we can read the old 'magic' by briefly turning off uahf.
-    const std::string oldUahf = GetArg("-uahfstarttime", "0");
-    mapArgs["-uahfstarttime"] = "0";
-    CAddrDB reader(from / "peers.dat");
-    CAddrMan peersDb;
-    bool peersOk = reader.Read(peersDb);
-    CBanDB banReader(from / "banlist.dat");
-    banmap_t banMap;
-    bool banOk = banReader.Read(banMap);
-
-    // turn uahf on again.
-    if (oldUahf == "0")
-        mapArgs.erase("-uahfstarttime");
-    else
-        mapArgs["-uahfstarttime"] = oldUahf;
-
-    if (peersOk) {
-        CAddrDB writer(to / "peers.dat");
-        writer.Write(peersDb);
-    }
-    if (banOk) {
-        CBanDB writer(to / "banlist.dat");
-        writer.Write(banMap);
-    }
     logInfo(42) << "Finished migration, removing placeholder";
 
     // remove PLACEHOLDER_FILENAME
