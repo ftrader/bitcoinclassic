@@ -912,6 +912,9 @@ QString formatServicesStr(quint64 mask)
             case NODE_BLOOM:
                 strList.append("BLOOM");
                 break;
+            case 8:
+                strList.append("SegWit");
+                break;
             case NODE_XTHIN:
                 strList.append("XTHIN");
                 break;
