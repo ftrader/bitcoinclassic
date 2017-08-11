@@ -1276,7 +1276,13 @@ void CWallet::ReacceptWalletTransactions()
         CWalletTx& wtx = *(item.second);
 
         LOCK(mempool.cs);
-        wtx.AcceptToMemoryPool(false);
+
+        CValidationState state;
+        if (!AcceptToMemoryPool(mempool, state, wtx, false, nullptr, false, true)
+                && state.GetRejectReason() == "mandatory-script-verify-flag-failed (Signature must use SIGHASH_FORKID)") {
+            mapWallet.erase(wtx.GetHash());
+            wtxOrdered.erase(wtx.nOrderPos);
+        }
     }
 }
 
@@ -2267,8 +2273,8 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey)
         if (fBroadcastTransactions)
         {
             // Broadcast
-            if (!wtxNew.AcceptToMemoryPool(false))
-            {
+            CValidationState state;
+            if (!AcceptToMemoryPool(mempool, state, wtxNew, false, nullptr, false, true)) {
                 // This must not fail. The transaction has already been signed and recorded.
                 LogPrintf("CommitTransaction(): Error: Transaction not valid\n");
                 return false;
@@ -3021,11 +3027,4 @@ int CMerkleTx::GetBlocksToMaturity() const
     if (!IsCoinBase())
         return 0;
     return std::max(0, (COINBASE_MATURITY+1) - GetDepthInMainChain());
-}
-
-
-bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectAbsurdFee)
-{
-    CValidationState state;
-    return ::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, false, fRejectAbsurdFee);
 }
