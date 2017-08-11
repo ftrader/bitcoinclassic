@@ -22,7 +22,7 @@ protected:
 
 public:
     BaseSignatureCreator(const CKeyStore* keystoreIn) : keystore(keystoreIn) {}
-    const CKeyStore& KeyStore() const { return *keystore; };
+    const CKeyStore& KeyStore() const { return *keystore; }
     virtual ~BaseSignatureCreator() {}
     virtual const BaseSignatureChecker& Checker() const =0;
 
