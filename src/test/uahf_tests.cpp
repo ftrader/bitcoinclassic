@@ -25,6 +25,8 @@
 #include <chainparams.h>
 #include <primitives/transaction.h>
 #include <main.h>
+#include <miner.h>
+#include <script/sign.h>
 #include <consensus/merkle.h>
 #include <consensus/validation.h>
 
@@ -350,6 +352,77 @@ BOOST_AUTO_TEST_CASE(Test_rollbackProtection)
 
     // we should not have had a re-org
     BOOST_CHECK_EQUAL(chainActive.Height(), 20);
+}
+
+BOOST_AUTO_TEST_CASE(Test_transactionAcceptance)
+{
+    // Generate a 101-block chain:
+    CKey coinbaseKey;
+    coinbaseKey.MakeNewKey(true);
+    CScript scriptPubKey = CScript() << ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;
+    Mining mining;
+    mining.SetCoinbase(scriptPubKey);
+    uint256 hash0, hash1;
+    for (int i = 0; i < 101; ++i) {
+        CBlockTemplate *pblocktemplate = mining.CreateNewBlock(Params());
+        CBlock &block = pblocktemplate->block;
+        unsigned int extraNonce = 0;
+        mining.IncrementExtraNonce(&block, chainActive.Tip(), extraNonce);
+        while (!CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus())) ++block.nNonce;
+
+        CValidationState state;
+        ProcessNewBlock(state, Params(), nullptr, &block, true, nullptr);
+        if (i == 0)
+            hash0 = block.vtx[0].GetHash();
+        if (i == 1)
+            hash1 = block.vtx[0].GetHash();
+        delete pblocktemplate;
+    }
+
+    CMutableTransaction tx;
+    tx.vin.resize(1);
+    tx.vin[0].prevout.hash = hash1;
+    tx.vin[0].prevout.n = 0;
+    tx.vout.resize(1);
+    tx.vout[0].nValue = 50*COIN;
+    tx.vout[0].scriptPubKey = CScript() << OP_TRUE;
+
+    // build proper transaction, properly signed
+    uint256 newHash = SignatureHash(scriptPubKey, tx, 0, 50 * COIN,
+            SIGHASH_ALL | SIGHASH_FORKID, SCRIPT_ENABLE_SIGHASH_FORKID);
+    std::vector<unsigned char> vchSig;
+    bool ok = coinbaseKey.Sign(newHash, vchSig);
+    BOOST_CHECK(ok);
+    vchSig.push_back((unsigned char)SIGHASH_ALL | SIGHASH_FORKID);
+    tx.vin[0].scriptSig << vchSig;
+    { // Check if this will be acceptable to the mempool
+        CValidationState state;
+        bool inputsMissing;
+        fRequireStandard = false;
+        ok = AcceptToMemoryPool(mempool, state, tx, false, &inputsMissing, false, false);
+        BOOST_CHECK(ok);
+        BOOST_CHECK(!inputsMissing);
+    }
+
+
+    // next transaction, without FORKID
+    tx.vin[0].prevout.hash = hash0;
+    newHash = SignatureHash(scriptPubKey, tx, 0, 50 * COIN, SIGHASH_ALL);
+    vchSig.clear();
+    ok = coinbaseKey.Sign(newHash, vchSig);
+    BOOST_CHECK(ok);
+    vchSig.push_back((unsigned char)SIGHASH_ALL);
+    tx.vin[0].scriptSig << vchSig;
+    { // Check if this will be acceptable to the mempool
+        CValidationState state;
+        bool inputsMissing;
+        ok = AcceptToMemoryPool(mempool, state, tx, false, &inputsMissing, false, false);
+        BOOST_CHECK(!inputsMissing);
+        BOOST_CHECK_EQUAL(ok, false);
+        int dos;
+        BOOST_CHECK(state.IsInvalid(dos));
+        BOOST_CHECK_EQUAL(dos, 100);
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
