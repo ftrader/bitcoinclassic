@@ -162,7 +162,7 @@ public:
 
     CAmount GetDustThreshold(const CFeeRate &minRelayTxFee) const
     {
-        // "Dust" is defined in terms of CTransaction::minRelayTxFee,
+        // "Dust" is defined in terms of ::minRelayTxFee,
         // which has units satoshis-per-kilobyte.
         // If you'd pay more than 1/3 in fees
         // to spend something, then we consider it dust.
