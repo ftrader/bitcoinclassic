@@ -840,7 +840,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
     if (tx.vout.empty())
         return state.DoS(10, false, REJECT_INVALID, "bad-txns-vout-empty");
     // Size limits
-    if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
+    if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_TX_SIZE)
         return state.DoS(100, false, REJECT_INVALID, "bad-txns-oversize");
 
     // Check for negative or overflow output values
@@ -2409,7 +2409,7 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     if (uahfForkBlock && uahfForkBlock->nHeight == pindexNew->nHeight) { // this is a new potential fork-block.
         // The uahf fork-block has to be larger than 1MB.
         const uint32_t minBlockSize = Params().GenesisBlock().nTime == Application::uahfStartTime() // no bigger block in default regtest setup.
-                && Params().NetworkIDString() == CBaseChainParams::REGTEST ? 0 : MAX_BLOCK_SIZE + 1;
+                && Params().NetworkIDString() == CBaseChainParams::REGTEST ? 0 : MAX_LEGACY_BLOCK_SIZE + 1;
         const std::uint32_t blockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
         if (blockSize < minBlockSize)
              return false;
@@ -3095,7 +3095,7 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
                 // If UAHF is enabled for the curent block, but not for the previous
                 // block, we must check that the block is larger than 1MB.
                 const uint32_t minBlockSize = Params().GenesisBlock().nTime == Application::uahfStartTime() // no bigger block in default regtest setup.
-                        && Params().NetworkIDString() == CBaseChainParams::REGTEST ? 0 : MAX_BLOCK_SIZE + 1;
+                        && Params().NetworkIDString() == CBaseChainParams::REGTEST ? 0 : MAX_LEGACY_BLOCK_SIZE + 1;
                 if (blockSize < minBlockSize)
                      return state.DoS(100, false, REJECT_INVALID, "bad-blk-too-small", false, "size limits failed");
             }
@@ -3542,7 +3542,7 @@ bool LoadBlockIndexDB()
                         CAutoFile file(Blocks::openFile(pos, true), SER_DISK, CLIENT_VERSION);
                         CBlock block;
                         file >> block;
-                        needsRollback = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION) <= MAX_BLOCK_SIZE;
+                        needsRollback = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION) <= MAX_LEGACY_BLOCK_SIZE;
 
                         if (!needsRollback) // remember for next time.
                             Blocks::DB::instance()->setUahfForkBlock(forkBlock);
