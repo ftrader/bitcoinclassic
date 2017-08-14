@@ -27,6 +27,8 @@ namespace Admin {
     class Server;
 }
 
+#define cApp Application::instance()
+
 /**
  * An application singleton that manages some application specific data.
  * The Application singleton can be used to have a single place that owns a threadpool
