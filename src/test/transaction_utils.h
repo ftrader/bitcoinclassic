@@ -10,7 +10,7 @@
 
 class CScript;
 struct CMutableTransaction;
-struct CTransaction;
+class CTransaction;
 
 namespace TxUtils {
     void RandomScript(CScript &script);
