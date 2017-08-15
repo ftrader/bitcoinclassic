@@ -17,10 +17,12 @@
 #include "torcontrol.h"
 #include "BlocksDB.h"
 #include "qt/guiconstants.h"
-#include "wallet/wallet.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
+#ifdef ENABLE_WALLET
+# include "wallet/wallet.h"
+#endif
 
 #include <set>
 
