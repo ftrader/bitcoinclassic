@@ -1,8 +1,22 @@
-// Copyright (c) 2012 Pieter Wuille
-// Copyright (c) 2012-2015 The Bitcoin Core developers
-// Copyright (c) 2017 Tom Zander <tomz@freedommail.ch>
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+/*
+ * This file is part of the bitcoin-classic project
+ * Copyright (c) 2012 Pieter Wuille
+ * Copyright (c) 2012-2015 The Bitcoin Core developers
+ * Copyright (c) 2017 Tom Zander <tomz@freedommail.ch>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "addrman.h"
 
@@ -28,6 +42,18 @@ bool CAddrInfo::getKnowsCash() const
 void CAddrInfo::setKnowsCash(bool value)
 {
     fKnowsCash = value;
+}
+
+void CAddrInfo::Init()
+{
+    nLastSuccess = 0;
+    nLastTry = 0;
+    nAttempts = 0;
+    nRefCount = 0;
+    fInTried = false;
+    fKnowsXThin = false;
+    fKnowsCash = false;
+    nRandomPos = -1;
 }
 
 int CAddrInfo::GetTriedBucket(const uint256& nKey) const
@@ -525,4 +551,116 @@ void CAddrMan::Connected_(const CService& addr, int64_t nTime)
     int64_t nUpdateInterval = 20 * 60;
     if (nTime - info.nTime > nUpdateInterval)
         info.nTime = nTime;
+}
+
+void CAddrMan::Clear()
+{
+    std::vector<int>().swap(vRandom);
+    nKey = GetRandHash();
+    for (size_t bucket = 0; bucket < ADDRMAN_NEW_BUCKET_COUNT; bucket++) {
+        for (size_t entry = 0; entry < ADDRMAN_BUCKET_SIZE; entry++) {
+            vvNew[bucket][entry] = -1;
+        }
+    }
+    for (size_t bucket = 0; bucket < ADDRMAN_TRIED_BUCKET_COUNT; bucket++) {
+        for (size_t entry = 0; entry < ADDRMAN_BUCKET_SIZE; entry++) {
+            vvTried[bucket][entry] = -1;
+        }
+    }
+
+    nIdCount = 0;
+    nTried = 0;
+    nNew = 0;
+}
+
+CAddrMan::CAddrMan()
+{
+    Clear();
+}
+
+CAddrMan::~CAddrMan()
+{
+    nKey.SetNull();
+}
+
+bool CAddrMan::Add(const CAddress &addr, const CNetAddr &source, int64_t nTimePenalty)
+{
+    bool fRet = false;
+    {
+        LOCK(cs);
+        Check();
+        fRet |= Add_(addr, source, nTimePenalty);
+        Check();
+    }
+    if (fRet)
+        LogPrint("addrman", "Added %s from %s: %i tried, %i new\n", addr.ToStringIPPort(), source.ToString(), nTried, nNew);
+    return fRet;
+}
+
+bool CAddrMan::Add(const std::vector<CAddress> &vAddr, const CNetAddr &source, int64_t nTimePenalty)
+{
+    int nAdd = 0;
+    {
+        LOCK(cs);
+        Check();
+        for (std::vector<CAddress>::const_iterator it = vAddr.begin(); it != vAddr.end(); it++)
+            nAdd += Add_(*it, source, nTimePenalty) ? 1 : 0;
+        Check();
+    }
+    if (nAdd)
+        LogPrint("addrman", "Added %i addresses from %s: %i tried, %i new\n", nAdd, source.ToString(), nTried, nNew);
+    return nAdd > 0;
+}
+
+void CAddrMan::Good(const CService &addr, int64_t nTime)
+{
+    LOCK(cs);
+    Check();
+    Good_(addr, nTime);
+    Check();
+}
+
+void CAddrMan::Attempt(const CService &addr, int64_t nTime)
+{
+    LOCK(cs);
+    Check();
+    Attempt_(addr, nTime);
+    Check();
+}
+
+CAddrInfo CAddrMan::Select(bool newOnly)
+{
+    CAddrInfo addrRet;
+    {
+        LOCK(cs);
+        Check();
+        addrRet = Select_(newOnly);
+        Check();
+    }
+    return addrRet;
+}
+
+std::vector<CAddress> CAddrMan::GetAddr()
+{
+    Check();
+    std::vector<CAddress> vAddr;
+    {
+        LOCK(cs);
+        GetAddr_(vAddr);
+    }
+    Check();
+    return vAddr;
+}
+
+void CAddrMan::Connected(const CService &addr, int64_t nTime)
+{
+    LOCK(cs);
+    Check();
+    Connected_(addr, nTime);
+    Check();
+}
+
+void CAddrMan::MakeDeterministic()
+{
+    nKey.SetNull();
 }
