@@ -53,7 +53,7 @@ bool CTxOrphanCache::AddOrphanTx(const CTransaction& tx, NodeId peer)
 
     unsigned int sz = tx.GetSerializeSize(SER_NETWORK, CTransaction::CURRENT_VERSION);
     if (sz > 100000) {
-        LogPrint("mempool", "ignoring large orphan tx (size: %u, hash: %s)\n", sz, hash.ToString());
+        logDebug(Log::Mempool) << "ignoring large orphan tx. Size:" << sz << "hash:" << hash.ToString();
         return false;
     }
 
@@ -64,8 +64,8 @@ bool CTxOrphanCache::AddOrphanTx(const CTransaction& tx, NodeId peer)
         m_mapOrphanTransactionsByPrev[txin.prevout.hash].insert(hash);
     }
 
-    LogPrint("mempool", "stored orphan tx %s (mapsz %u prevsz %u)\n", hash.ToString(),
-             m_mapOrphanTransactions.size(), m_mapOrphanTransactionsByPrev.size());
+    logDebug(Log::Mempool) << "stored orphan tx" << hash << "(mapsz"
+        << m_mapOrphanTransactions.size() << "prevsz " << m_mapOrphanTransactionsByPrev.size() << ')';
     return true;
 }
 
@@ -102,7 +102,7 @@ void CTxOrphanCache::EraseOrphansByTime()
         if (nEntryTime < nOrphanTxCutoffTime) {
             uint256 txHash = entry->second.tx.GetHash();
             EraseOrphanTx(txHash);
-            LogPrint("mempool", "Erased old orphan tx %s of age %d seconds\n", txHash.ToString(), GetTime() - nEntryTime);
+            logDebug(Log::Mempool) << "Erased old orphan tx" << txHash << "of age" << (GetTime() - nEntryTime) << "seconds";
         }
     }
 

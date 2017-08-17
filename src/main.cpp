@@ -1076,6 +1076,7 @@ bool AcceptToMemoryPoolWorker(CTxMemPool& pool, CValidationState &state, const C
             if (dFreeCount >= GetArg("-limitfreerelay", DEFAULT_LIMITFREERELAY) * 10 * 1000)
                 return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "rate limited free transaction");
             LogPrint("mempool", "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount+nSize);
+            logDebug(Log::Mempool) << "Rate limit dFreeCount:" << dFreeCount << "=>" << dFreeCount+nSize;
             dFreeCount += nSize;
         }
 
@@ -4550,10 +4551,10 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
         }
 
         if (fDebug || (vInv.size() != 1))
-            LogPrint("net", "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
+            logDebug(Log::Net) << "received getdata (" << vInv.size() << "invsz) peer:" << pfrom->id;
 
         if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
-            LogPrint("net", "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
+            logDebug(Log::Net) << "received getdata for:" << vInv[0].ToString() << "peer:" << pfrom->id;
 
         pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
         ProcessGetData(pfrom, chainparams.GetConsensus());
@@ -4685,10 +4686,8 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
             RelayTransaction(tx);
             vWorkQueue.push_back(inv.hash);
 
-            LogPrint("mempool", "AcceptToMemoryPool: peer=%d: accepted %s (poolsz %u txn, %u kB)\n",
-                pfrom->id,
-                tx.GetHash().ToString(),
-                mempool.size(), mempool.DynamicMemoryUsage() / 1000);
+            logDebug(Log::Mempool) << "AcceptToMemoryPool: peer" << pfrom->id << "accepted" << tx.GetHash()
+                                   << "(poolsz" << mempool.size() << "txn," << (mempool.DynamicMemoryUsage() / 1000) << "kB)";
 
             // Recursively process any orphan transactions that depended on this one
             std::set<NodeId> setMisbehaving;
@@ -4706,9 +4705,8 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
 
                     if (setMisbehaving.count(mi->fromPeer))
                         continue;
-                    if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
-                    {
-                        LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
+                    if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2)) {
+                        logDebug(Log::Mempool) << "   accepted orphan tx" << orphanHash;
                         RelayTransaction(orphanTx);
                         vWorkQueue.push_back(orphanHash);
                         vEraseQueue.push_back(orphanHash);
@@ -4721,11 +4719,11 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
                             // Punish peer that gave us an invalid orphan tx
                             Misbehaving(mi->fromPeer, nDos);
                             setMisbehaving.insert(mi->fromPeer);
-                            LogPrint("mempool", "   invalid orphan tx %s\n", orphanHash.ToString());
+                            logDebug(Log::Mempool) << "   invalid orphan tx" << orphanHash;
                         }
                         // Has inputs but not accepted to mempool
                         // Probably non-standard or insufficient fee/priority
-                        LogPrint("mempool", "   removed orphan tx %s\n", orphanHash.ToString());
+                        logDebug(Log::Mempool) << "   removed orphan tx" << orphanHash;
                         vEraseQueue.push_back(orphanHash);
                         assert(recentRejects);
                         recentRejects->insert(orphanHash);
@@ -4744,7 +4742,7 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
             cache->AddOrphanTx(tx, pfrom->GetId());
             std::uint32_t nEvicted = cache->LimitOrphanTxSize();
             if (nEvicted > 0)
-                LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
+                logDebug(Log::Mempool) << "mapOrphan overflow, removed" << nEvicted << "tx";
         } else {
             assert(recentRejects);
             recentRejects->insert(tx.GetHash());
@@ -4811,14 +4809,16 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
             CValidationState state;
             if (pindexLast != NULL && header.hashPrevBlock != pindexLast->GetBlockHash()) {
                 Misbehaving(pfrom->GetId(), 20);
-                return error("non-continuous headers sequence");
+                logWarning(Log::Net) << "p2p HEADERS command received non-continues headers sequence from" << pfrom->GetId();
+                return false;
             }
             if (!AcceptBlockHeader(header, state, chainparams, &pindexLast)) {
                 int nDoS;
                 if (state.IsInvalid(nDoS)) {
                     if (nDoS > 0)
                         Misbehaving(pfrom->GetId(), nDoS);
-                    return error("invalid header received");
+                    logWarning(Log::Net) << "p2p HEADERS command received invalid header from" << pfrom->GetId();
+                    return false;
                 }
             }
         }
@@ -4830,7 +4830,8 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
             // Headers message had its maximum size; the peer may have more headers.
             // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
             // from there instead.
-            LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
+            logDebug(Log::Net).nospace() << "more getheaders (" << pindexLast->nHeight
+                << ") to end to peer=" << pfrom->id << "(startheight:" << pfrom->nStartingHeight << ")";
             pfrom->PushMessage(NetMsgType::GETHEADERS, chainActive.GetLocator(pindexLast), uint256());
         }
 
