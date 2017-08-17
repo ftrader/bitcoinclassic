@@ -1589,7 +1589,7 @@ void ThreadOpenConnections()
 
                     if (minXThinNodes > 0 && pnode->ThinBlockCapable())
                         ++nThinBlockCapable;
-                    else if (minCashNodes > 0 && pnode->nServices & NODE_BITCOIN_CASH)
+                    else if (minCashNodes > 0 && pnode->nServices & NODE_BITCOIN_CASH && minCashNodes > cashCapableNodes)
                         ++cashCapableNodes;
                     else if (!ptemp)
                         ptemp = pnode;
