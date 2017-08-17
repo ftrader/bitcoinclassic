@@ -3,14 +3,8 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "hash.h"
-#include "utilstrencodings.h"
 #include "test/test_bitcoin.h"
-
-#include <vector>
-
 #include <boost/test/unit_test.hpp>
-
-using namespace std;
 
 BOOST_FIXTURE_TEST_SUITE(hash_tests, BasicTestingSetup)
 

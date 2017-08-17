@@ -7,14 +7,10 @@
 //
 
 #include "checkpoints.h"
-
-#include "uint256.h"
-#include "test/test_bitcoin.h"
 #include "chainparams.h"
+#include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
-
-using namespace std;
 
 BOOST_FIXTURE_TEST_SUITE(Checkpoints_tests, BasicTestingSetup)
 

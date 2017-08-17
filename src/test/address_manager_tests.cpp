@@ -3,15 +3,12 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "addrman.h"
 #include "test/test_bitcoin.h"
-#include <string>
 #include <boost/test/unit_test.hpp>
 #include "hash.h"
 #include "serialize.h"
 #include "streams.h"
 #include "net.h"
 #include "chainparams.h"
-
-using namespace std;
 
 class CAddrManSerializationMock : public CAddrMan
 {
@@ -63,7 +60,7 @@ CDataStream AddrmanToStream(CAddrManSerializationMock& addrman)
     ssPeersIn << FLATDATA(Params().magic());
     ssPeersIn << addrman;
     std::string str = ssPeersIn.str();
-    vector<unsigned char> vchData(str.begin(), str.end());
+    std::vector<unsigned char> vchData(str.begin(), str.end());
     return CDataStream(vchData, SER_DISK, CLIENT_VERSION);
 }
 

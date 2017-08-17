@@ -2,20 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "pubkey.h"
-#include "key.h"
 #include "policy/policy.h"
-#include "script/script.h"
-#include "script/standard.h"
-#include "uint256.h"
 #include "test/test_bitcoin.h"
-
-#include <vector>
-
-#include <boost/foreach.hpp>
 #include <boost/test/unit_test.hpp>
-
-using namespace std;
 
 // Helpers:
 static std::vector<unsigned char>
