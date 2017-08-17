@@ -4351,7 +4351,7 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
     }
 
 
-    else if (strCommand == NetMsgType::ADDR)
+    else if (strCommand == NetMsgType::ADDR && (Application::uahfChainState() == Application::UAHFDisabled) == (pfrom->nServices & NODE_BITCOIN_CASH) == 0)
     {
         std::vector<CAddress> vAddr;
         vRecv >> vAddr;
