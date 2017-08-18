@@ -16,14 +16,7 @@
 #include "wallet/wallet_ismine.h"
 #include "wallet/walletdb.h"
 
-#include <algorithm>
-#include <map>
-#include <set>
 #include <stdexcept>
-#include <stdint.h>
-#include <string>
-#include <utility>
-#include <vector>
 
 #include <boost/shared_ptr.hpp>
 

@@ -20,7 +20,7 @@
 #include <Message.h>
 
 #include <boost/algorithm/hex.hpp>
-#include <assert.h>
+#include <cassert>
 
 #include <util.h>
 

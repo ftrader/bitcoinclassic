@@ -43,11 +43,11 @@
 #include "wallet/wallet.h"
 #include "wallet/walletdb.h"
 #endif
-#include <stdint.h>
-#include <stdio.h>
+#include <cstdint>
+#include <cstdio>
 
 #ifndef WIN32
-#include <signal.h>
+#include <csignal>
 #endif
 
 #include <boost/algorithm/string/classification.hpp>

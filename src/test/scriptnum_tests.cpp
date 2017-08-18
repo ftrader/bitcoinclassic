@@ -7,8 +7,6 @@
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
-#include <limits.h>
-#include <stdint.h>
 
 BOOST_FIXTURE_TEST_SUITE(scriptnum_tests, BasicTestingSetup)
 

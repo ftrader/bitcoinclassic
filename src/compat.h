@@ -41,7 +41,7 @@
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <ifaddrs.h>
-#include <limits.h>
+#include <climits>
 #include <netdb.h>
 #include <unistd.h>
 #endif

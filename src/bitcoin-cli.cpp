@@ -12,7 +12,7 @@
 #include "utilstrencodings.h"
 
 #include <boost/filesystem/operations.hpp>
-#include <stdio.h>
+#include <cstdio>
 
 #include <event2/event.h>
 #include <event2/http.h>

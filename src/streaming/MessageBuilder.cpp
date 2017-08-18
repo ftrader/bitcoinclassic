@@ -19,9 +19,8 @@
 #include "MessageBuilder_p.h"
 #include "BufferPool.h"
 
+#include <cassert>
 #include <util.h>
-
-#include <assert.h>
 
 namespace {
     int serialize(char *data, uint64_t value)

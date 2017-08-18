@@ -8,8 +8,6 @@
 
 #include "consensus/params.h"
 
-#include <stdint.h>
-
 class CBlockHeader;
 class CBlockIndex;
 class uint256;

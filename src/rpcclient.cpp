@@ -4,15 +4,11 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "rpcclient.h"
-
 #include "rpcprotocol.h"
 #include "util.h"
 
 #include <set>
-#include <stdint.h>
-
 #include <boost/algorithm/string/case_conv.hpp> // for to_lower()
-#include <univalue.h>
 
 class CRPCConvertParam
 {

@@ -19,8 +19,6 @@
 #include "wallet/walletdb.h"
 #endif
 
-#include <stdint.h>
-
 #include <boost/assign/list_of.hpp>
 
 #include <univalue.h>

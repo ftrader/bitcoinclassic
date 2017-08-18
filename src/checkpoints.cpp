@@ -10,8 +10,6 @@
 #include "uint256.h"
 #include "BlocksDB.h"
 
-#include <stdint.h>
-
 #include <boost/foreach.hpp>
 
 namespace Checkpoints {

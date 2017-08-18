@@ -6,9 +6,6 @@
 #include "test/test_bitcoin.h"
 #include <policy/policy.h>
 
-#include <string>
-#include <vector>
-
 #include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
 #include <boost/test/unit_test.hpp>

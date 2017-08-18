@@ -13,8 +13,8 @@
 #include "uint256.h"
 #include "BlocksDB.h"
 
-#include <assert.h>
-#include <stdint.h>
+#include <cstdint>
+#include <cassert>
 
 #include <boost/foreach.hpp>
 #include <boost/unordered_map.hpp>
