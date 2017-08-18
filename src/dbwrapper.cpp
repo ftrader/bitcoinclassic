@@ -13,7 +13,6 @@
 #include <leveldb/env.h>
 #include <leveldb/filter_policy.h>
 #include <memenv.h>
-#include <stdint.h>
 
 void HandleError(const leveldb::Status& status) throw(dbwrapper_error)
 {

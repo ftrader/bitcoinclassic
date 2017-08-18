@@ -17,7 +17,7 @@
 #include "utilmoneystr.h"
 #include "utilstrencodings.h"
 
-#include <stdio.h>
+#include <cstdio>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/assign/list_of.hpp>

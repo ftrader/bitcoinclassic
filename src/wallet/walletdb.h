@@ -11,10 +11,6 @@
 #include "key.h"
 
 #include <list>
-#include <stdint.h>
-#include <string>
-#include <utility>
-#include <vector>
 
 static const bool DEFAULT_FLUSHWALLET = true;
 

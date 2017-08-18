@@ -24,7 +24,7 @@
 // the pagefile except in rare circumstances where memory is extremely low.
 #else
 #include <sys/mman.h>
-#include <limits.h> // for PAGESIZE
+#include <climits> // for PAGESIZE
 #include <unistd.h> // for sysconf
 #endif
 

@@ -8,8 +8,6 @@
 
 #include "uint256.h"
 
-#include <stdint.h>
-
 /**
  * Seed OpenSSL PRNG with additional entropy data
  */

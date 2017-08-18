@@ -20,9 +20,6 @@
 
 #include "ConstBuffer.h"
 
-#include <vector>
-#include <string>
-#include <cstdint>
 #include <uint256.h>
 
 #include <boost/variant.hpp>

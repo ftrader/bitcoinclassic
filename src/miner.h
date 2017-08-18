@@ -9,7 +9,6 @@
 
 #include "primitives/block.h"
 
-#include <stdint.h>
 #include <mutex>
 
 #include <boost/thread.hpp>

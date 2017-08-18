@@ -22,8 +22,6 @@
 
 #include <exception>
 #include <map>
-#include <stdint.h>
-#include <string>
 #include <vector>
 
 #include <boost/filesystem/path.hpp>

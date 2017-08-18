@@ -15,13 +15,9 @@
 #include "wallet.h"
 
 #include <fstream>
-#include <stdint.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-
-#include <univalue.h>
-
 #include <boost/foreach.hpp>
 
 void EnsureWalletIsUnlocked();

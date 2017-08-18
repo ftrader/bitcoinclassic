@@ -8,10 +8,9 @@
 #include "util.h"
 #include "crypto/hmac_sha256.h"
 
-#include <vector>
 #include <deque>
 #include <set>
-#include <stdlib.h>
+#include <cstdlib>
 
 #include <boost/function.hpp>
 #include <boost/bind.hpp>

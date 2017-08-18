@@ -3,10 +3,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "crypto/sha1.h"
-
 #include "crypto/common.h"
 
-#include <string.h>
+#include <cstring>
 
 // Internal implementation code.
 namespace

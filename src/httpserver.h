@@ -6,7 +6,7 @@
 #define BITCOIN_HTTPSERVER_H
 
 #include <string>
-#include <stdint.h>
+#include <cstdint>
 #include <boost/thread.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/function.hpp>

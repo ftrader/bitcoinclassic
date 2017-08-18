@@ -28,10 +28,7 @@
 #include "timedata.h"
 #include "util.h"
 
-#include <map>
 #include <set>
-#include <stdint.h>
-#include <vector>
 
 /**
  * Extended statistics about a CAddress

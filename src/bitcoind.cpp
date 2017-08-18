@@ -19,7 +19,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 
-#include <stdio.h>
+#include <cstdio>
 
 static bool fDaemon;
 

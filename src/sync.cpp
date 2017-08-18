@@ -7,7 +7,7 @@
 #include "util.h"
 #include "utilstrencodings.h"
 
-#include <stdio.h>
+#include <cstdio>
 
 #include <boost/foreach.hpp>
 #include <boost/thread.hpp>

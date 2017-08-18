@@ -22,10 +22,6 @@
 #include "utilstrencodings.h"
 #include "primitives/block.h"
 
-#include <stdint.h>
-
-#include <univalue.h>
-
 extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry);
 void ScriptPubKeyToJSON(const CScript& scriptPubKey, UniValue& out, bool fIncludeHex);
 

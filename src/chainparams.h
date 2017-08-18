@@ -11,8 +11,6 @@
 #include "primitives/block.h"
 #include "protocol.h"
 
-#include <vector>
-
 struct CDNSSeedData {
     std::string name, host;
     CDNSSeedData(const std::string &strName, const std::string &strHost) : name(strName), host(strHost) {}

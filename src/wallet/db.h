@@ -12,10 +12,6 @@
 #include "sync.h"
 #include "version.h"
 
-#include <map>
-#include <string>
-#include <vector>
-
 #include <boost/filesystem/path.hpp>
 
 #include <db_cxx.h>
