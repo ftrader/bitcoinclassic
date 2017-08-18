@@ -21,9 +21,6 @@
 #include "script/standard.h"
 #include "support/allocators/zeroafterfree.h"
 
-#include <string>
-#include <vector>
-
 /**
  * Encode a byte sequence as a base58-encoded string.
  * pbegin and pend cannot be NULL, unless both are.

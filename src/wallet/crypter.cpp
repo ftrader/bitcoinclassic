@@ -10,8 +10,6 @@
 #include "script/standard.h"
 #include "util.h"
 
-#include <string>
-#include <vector>
 #include <boost/foreach.hpp>
 
 int CCrypter::BytesToKeySHA512AES(const std::vector<unsigned char>& chSalt, const SecureString& strKeyData, int count, unsigned char *key,unsigned char *iv) const

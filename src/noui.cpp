@@ -9,8 +9,6 @@
 #include "util.h"
 
 #include <cstdio>
-#include <stdint.h>
-#include <string>
 
 static bool noui_ThreadSafeMessageBox(const std::string& message, const std::string& caption, unsigned int style)
 {

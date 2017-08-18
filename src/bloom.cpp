@@ -11,8 +11,7 @@
 #include "random.h"
 #include "streams.h"
 
-#include <math.h>
-#include <stdlib.h>
+#include <cmath>
 
 #include <boost/foreach.hpp>
 

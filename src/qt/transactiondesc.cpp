@@ -18,9 +18,6 @@
 #include "wallet/db.h"
 #include "wallet/wallet.h"
 
-#include <stdint.h>
-#include <string>
-
 QString TransactionDesc::FormatTxStatus(const CWalletTx& wtx)
 {
     AssertLockHeld(cs_main);

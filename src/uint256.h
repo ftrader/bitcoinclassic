@@ -9,13 +9,12 @@
 #include "crypto/common.h"
 #include "Logger.h"
 
-#include <assert.h>
+#include <cassert>
 #include <cstring>
 #include <stdexcept>
-#include <stdint.h>
+#include <cstdint>
 #include <string>
 #include <vector>
-
 
 /** Template base class for fixed-sized opaque blobs. */
 template<unsigned int BITS>

@@ -28,8 +28,6 @@
 #include "util.h"
 #include "utilmoneystr.h"
 
-#include <assert.h>
-
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>

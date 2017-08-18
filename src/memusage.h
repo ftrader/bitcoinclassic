@@ -5,8 +5,7 @@
 #ifndef BITCOIN_MEMUSAGE_H
 #define BITCOIN_MEMUSAGE_H
 
-#include <stdlib.h>
-
+#include <cstdlib>
 #include <map>
 #include <set>
 #include <vector>

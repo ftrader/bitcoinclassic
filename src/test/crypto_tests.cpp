@@ -13,8 +13,6 @@
 #include "utilstrencodings.h"
 #include "test/test_bitcoin.h"
 
-#include <vector>
-
 #include <boost/assign/list_of.hpp>
 #include <boost/test/unit_test.hpp>
 #include <openssl/aes.h>

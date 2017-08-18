@@ -19,7 +19,6 @@
 #include "uint256.h"
 
 #include <deque>
-#include <stdint.h>
 
 #ifndef WIN32
 #include <arpa/inet.h>

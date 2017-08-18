@@ -19,7 +19,6 @@
 #include "util.h"
 
 #include <iostream>
-#include <strings.h>
 
 namespace {
 std::string shortenMethod(const char *methodName) {

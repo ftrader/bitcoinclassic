@@ -8,21 +8,16 @@
 #define BITCOIN_SERIALIZE_H
 
 #include "compat/endian.h"
+#include "prevector.h"
+#include "uint256.h"
 
 #include <algorithm>
-#include <assert.h>
+#include <cassert>
 #include <ios>
 #include <limits>
 #include <map>
 #include <set>
-#include <stdint.h>
-#include <string>
-#include <string.h>
 #include <utility>
-#include <vector>
-
-#include "prevector.h"
-#include "uint256.h"
 
 #include <boost/variant.hpp>
 

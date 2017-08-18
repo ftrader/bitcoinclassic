@@ -21,9 +21,6 @@
 #include "ConstBuffer.h"
 #include "Message.h"
 
-#include <vector>
-#include <string>
-#include <cstdint>
 #include <uint256.h>
 
 namespace Streaming {
