@@ -144,7 +144,7 @@ public:
     void loadDefaultTestSetup();
 
     /**
-     * @brief parseConfig reads the config file logging.conf from the datadir.
+     * @brief parseConfig reads the config file logs.conf from the datadir.
      * The config file is a list of channels to output to and the log sections with
      * log-verbosity.
      * Example file;
