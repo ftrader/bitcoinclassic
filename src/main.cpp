@@ -2408,13 +2408,16 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
     }
 
     CBlockIndex *uahfForkBlock = Blocks::DB::instance()->uahfForkBlock();
-    if (uahfForkBlock && uahfForkBlock->nHeight == pindexNew->nHeight) { // this is a new potential fork-block.
+    if (Application::uahfChainState() == Application::UAHFRulesActive
+            || (uahfForkBlock && uahfForkBlock->nHeight == pindexNew->nHeight)) { // this is a new potential fork-block.
         // The uahf fork-block has to be larger than 1MB.
         const uint32_t minBlockSize = Params().GenesisBlock().nTime == Application::uahfStartTime() // no bigger block in default regtest setup.
                 && Params().NetworkIDString() == CBaseChainParams::REGTEST ? 0 : MAX_LEGACY_BLOCK_SIZE + 1;
         const std::uint32_t blockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
-        if (blockSize < minBlockSize)
-             return false;
+        if (blockSize < minBlockSize) {
+            InvalidBlockFound(pindexNew, state);
+            return state.DoS(100, false, REJECT_INVALID, "bad-blk-too-small", false, "size limits failed");
+        }
     }
 
     // Apply the block atomically to the chain state.
@@ -3531,13 +3534,13 @@ bool LoadBlockIndexDB()
                 logWarning(8002) << "The UAHF fork-block is not in the main chain! Height:" << forkBlock->nHeight;
                 needsRollback = true;
             }
-        } else {
+        } else if (chainActive.Height() > 2) {
             // there could be two reasons, either Classic wasn't the one finding the fork-block,
             // and thus didn't store its hash, or we are on the wrong chain.
 
             assert(Application::uahfStartTime() > 0);
             CBlockIndex *blockIndex = it->second;
-            while (blockIndex && blockIndex->GetMedianTimePast() > Application::uahfStartTime())
+            while (blockIndex->pprev && blockIndex->pprev->GetMedianTimePast() > Application::uahfStartTime())
                 blockIndex = blockIndex->pprev;
             if (blockIndex) {
                 forkHeight = blockIndex->nHeight + 1;
@@ -3569,21 +3572,22 @@ bool LoadBlockIndexDB()
         Application::setUahfChainState(Application::UAHFRulesActive);
         if (needsRollback) {
             logCritical(8002) << "Detected your chain was not UAHF, will need to rollback to the fork-block!";
-            if (forkHeight > 0) {
+            if (forkHeight > 0)
                 logInfo(8002) << " Fork-block is at:" << forkHeight;
-                uiInterface.InitMessage(strprintf("Rolling back chain to UAHF-branch-point (%d blocks)...",
-                                    chainActive.Tip()->nHeight - forkHeight));
-            } else {
+            else
                 uiInterface.InitMessage("Rolling back chain to UAHF-branch-point...");
-            }
 
             while (chainActive.Height() > 12 && chainActive.Tip()->pprev->GetMedianTimePast() > Application::uahfStartTime()) {
+                if (forkHeight > 0) {
+                    uiInterface.InitMessage(strprintf("Rolling back chain to UAHF-branch-point (%d blocks)...",
+                                        chainActive.Tip()->nHeight - forkHeight));
+                }
                 logInfo(8002) << " reverting" << chainActive.Tip()->GetBlockHash() << chainActive.Tip()->nHeight;
                 CValidationState state;
                 bool ok = DisconnectTip(state, Params().GetConsensus());
                 if (!ok) {
-                    logFatal(8002) << "Failed to revert a block, likely due to a database error. This is fatal;. Shutting down now";
-                    AbortNode(state, "Failed to revert a block, likely due to a database error. This is fatal;. Shutting down now");
+                    logFatal(8002) << "Failed to revert a block, likely due to a database error. This is fatal. Shutting down now";
+                    AbortNode(state, "Failed to revert a block, likely due to a database error. This is fatal. Shutting down now");
                     return false;
                 }
                 if (ShutdownRequested())
