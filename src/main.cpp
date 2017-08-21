@@ -2282,10 +2282,13 @@ void static UpdateTip(CBlockIndex *pindexNew) {
     nTimeBestReceived = GetTime();
     mempool.AddTransactionsUpdated(1);
 
-    LogPrintf("%s: new best=%s  height=%d  log2_work=%.8g  tx=%lu  date=%s progress=%f  cache=%.1fMiB(%utx)\n", __func__,
-      chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(), log(chainActive.Tip()->nChainWork.getdouble())/log(2.0), (unsigned long)chainActive.Tip()->nChainTx,
-      DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
-      Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), chainActive.Tip()), pcoinsTip->DynamicMemoryUsage() * (1.0 / (1<<20)), pcoinsTip->GetCacheSize());
+    logCritical(Log::Validation).nospace() << "new best=" << chainActive.Tip()->GetBlockHash() << " height=" << chainActive.Height()
+            << "  log2_work=" << log(chainActive.Tip()->nChainWork.getdouble())/log(2.0)
+            << "  tx=" << chainActive.Tip()->nChainTx
+            << "  date=" << DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()).c_str()
+            << "  progress=" <<  Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), chainActive.Tip())
+            << Log::Fixed << Log::precision(1) << "  cache=" << pcoinsTip->DynamicMemoryUsage() * (1.0 / (1<<20))
+            << "MiB(" << pcoinsTip->GetCacheSize() << "tx)";
 
     cvBlockChange.notify_all();
 
@@ -2306,7 +2309,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
                         fWarned = true;
                     }
                 } else {
-                    LogPrintf("%s: unknown new rules are about to activate (versionbit %i)\n", __func__, bit);
+                    logCritical(Log::Validation) << "unknown new rules are about to activate. Versionbit:" << bit;
                 }
             }
         }
@@ -2318,7 +2321,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
             pindex = pindex->pprev;
         }
         if (nUpgraded > 0)
-            LogPrintf("%s: %d of last 100 blocks have unexpected version\n", __func__, nUpgraded);
+            logWarning(Log::Validation) << nUpgraded << "of last 100 blocks have unexpected version";
         if (nUpgraded > 100/2)
         {
             // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
@@ -4766,11 +4769,9 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
             }
         }
         int nDoS = 0;
-        if (state.IsInvalid(nDoS))
-        {
-            LogPrint("mempoolrej", "%s from peer=%d was not accepted: %s\n", tx.GetHash().ToString(),
-                pfrom->id,
-                FormatStateMessage(state));
+        if (state.IsInvalid(nDoS)) {
+            logWarning(Log::Mempool) << tx.GetHash() << "from peer" << pfrom->id <<"was not accepted"
+                << FormatStateMessage(state);
             if (state.GetRejectCode() < REJECT_INTERNAL) // Never send AcceptToMemoryPool's internal codes over P2P
                 pfrom->PushMessage(NetMsgType::REJECT, strCommand, (unsigned char)state.GetRejectCode(),
                                    state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);

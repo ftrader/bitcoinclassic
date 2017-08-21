@@ -122,7 +122,7 @@ void DatadirMigration::migrateToCashIfNeeded()
         logsConf << "#####  Log sections from Log::Sections and verbosity" << std::endl;
         logsConf << "# Lookup is 1) direct match.  2) group (n mod 1000)  3) default to 'info'" << std::endl;
         logsConf << "# numbers come from file Logging.h, enum Log::Sections" << std::endl;
-        logsConf << "0 info\n1000 info\n2000 quiet\n3000 quiet\n4000 quiet\n5000 quiet\n6000 quiet" << std::endl;
+        logsConf << "0 silent\n1000 quiet\n2000 quiet\n3000 quiet\n4000 quiet\n5000 quiet\n6000 quiet" << std::endl;
         logsConf << "# silent only shows fatal" << std::endl;
         logsConf << "# quiet only shows critical and fatal" << std::endl;
         logsConf << "# info shows warning, info, critical and fatal" << std::endl;
