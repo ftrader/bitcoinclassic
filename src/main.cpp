@@ -1,8 +1,22 @@
-// Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2017 Tom Zander <tomz@freedommail.ch>
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+/*
+ * This file is part of the bitcoin-classic project
+ * Copyright (c) 2009-2010 Satoshi Nakamoto
+ * Copyright (c) 2009-2015 The Bitcoin Core developers
+ * Copyright (C) 2017 Tom Zander <tomz@freedommail.ch>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "main.h"
 
@@ -3527,46 +3541,12 @@ bool LoadBlockIndexDB()
     if (Application::uahfChainState() != Application::UAHFDisabled) {
         bool needsRollback = false;
         // check if we are indeed on the proper chain.
-        CBlockIndex *forkBlock = Blocks::DB::instance()->uahfForkBlock();
-        int forkHeight = -1;
-        if (forkBlock) {
-            if (!chainActive.Contains(forkBlock)) {
-                logWarning(8002) << "The UAHF fork-block is not in the main chain! Height:" << forkBlock->nHeight;
+        int forkHeight = Params().uahfForkBlockHeight();
+        if (chainActive.Height() >= forkHeight) {
+            CBlockIndex *forkBlock = chainActive[forkHeight];
+            if (Params().uahfForkBlockId() != forkBlock->GetBlockHash()) {
+                logWarning(8002) << "The UAHF fork-block is not in the main chain";
                 needsRollback = true;
-            }
-        } else if (chainActive.Height() > 2) {
-            // there could be two reasons, either Classic wasn't the one finding the fork-block,
-            // and thus didn't store its hash, or we are on the wrong chain.
-
-            assert(Application::uahfStartTime() > 0);
-            CBlockIndex *blockIndex = it->second;
-            while (blockIndex->pprev && blockIndex->pprev->GetMedianTimePast() > Application::uahfStartTime())
-                blockIndex = blockIndex->pprev;
-            if (blockIndex) {
-                forkHeight = blockIndex->nHeight + 1;
-                needsRollback = true;
-                // this is the last valid shared block. Lets see about the next one.
-                forkBlock = chainActive[forkHeight];
-                if (forkBlock) {
-                    try {
-                        CDiskBlockPos pos = forkBlock->GetBlockPos();
-                        CAutoFile file(Blocks::openFile(pos, true), SER_DISK, CLIENT_VERSION);
-                        CBlock block;
-                        file >> block;
-                        needsRollback = ::GetSerializeSize(block, SER_DISK, CLIENT_VERSION) <= MAX_LEGACY_BLOCK_SIZE;
-
-                        if (!needsRollback) // remember for next time.
-                            Blocks::DB::instance()->setUahfForkBlock(forkBlock);
-                    } catch (const std::exception &e) {
-                        if (fPruneMode) {
-                            // can't decide myself. Let the user decide.
-                            logWarning(8002) << "I could not verify if this is in reality an UAHF chain, due to pruning, "
-                                                "if you fail to get any blocks you may have to reindex.";
-                        } else {
-                            logInfo(8002) << "Failed to find the fork-off block. Reason:" << e;
-                        }
-                    }
-                }
             }
         }
         Application::setUahfChainState(Application::UAHFRulesActive);
@@ -3602,10 +3582,10 @@ bool LoadBlockIndexDB()
 
     PruneBlockIndexCandidates();
 
-    LogPrintf("%s: hashBestChain=%s height=%d date=%s progress=%f\n", __func__,
-        chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(),
-        DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
-        Checkpoints::GuessVerificationProgress(chainparams.Checkpoints(), chainActive.Tip()));
+    logCritical(Log::Validation) << "LoadBlockIndexDB: hashBestChain:" << chainActive.Tip()->GetBlockHash()
+                                 << "height:" << chainActive.Height()
+                                 << "date:" << DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime())
+                                 << "progress:" <<  Checkpoints::GuessVerificationProgress(chainparams.Checkpoints(), chainActive.Tip());
 
     return true;
 }
