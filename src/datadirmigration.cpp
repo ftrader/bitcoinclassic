@@ -44,7 +44,8 @@ DatadirMigration::DatadirMigration()
     m_needsMigration = m_needsMigration && ChainNameFromCommandLine() == CBaseChainParams::MAIN;
 
     // only when we are an UAHF (Bitcoin Cash) client.
-    m_needsMigration = m_needsMigration && GetArg("-uahfstarttime",  UAHF_CLIENT) > 0;
+    const bool fallback = GetArg("-uahfstarttime",  UAHF_CLIENT) > 0;
+    m_needsMigration = m_needsMigration && GetBoolArg("-uahf", fallback);
 
     // only when we actually have an orig dir.
     if (m_needsMigration) {

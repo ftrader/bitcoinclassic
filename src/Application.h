@@ -93,6 +93,7 @@ public:
 protected:
     /// only called from constructor. Useful in unit tests.
     void init();
+    int64_t m_uahfStartTme;
 
 private:
     std::shared_ptr<boost::asio::io_service> m_ioservice;
@@ -104,7 +105,6 @@ private:
     int m_returnCode;
     bool m_closingDown;
     UAHFState m_uahfState;
-    int64_t m_uahfStartTme;
 };
 
 #endif

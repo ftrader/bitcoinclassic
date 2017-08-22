@@ -116,11 +116,19 @@ class MockApplication : public Application
 public:
     MockApplication() = delete;
 
-    void pub_init() {
+    inline static void doInit() {
+        static_cast<MockApplication*>(Application::instance())->pub_init();
+    }
+    inline static void setUAHFStartTime(int64_t time) {
+        static_cast<MockApplication*>(Application::instance())->pub_setUAHFStartTime(time);
+    }
+
+protected:
+    inline void pub_init() {
         init();
     }
-    static void doInit() {
-        static_cast<MockApplication*>(Application::instance())->pub_init();
+    inline void pub_setUAHFStartTime(int64_t time) {
+        m_uahfStartTme = time;
     }
 };
 

@@ -31,6 +31,11 @@
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 
+#ifndef UAHF_CLIENT
+# define UAHF_CLIENT 0
+#endif
+
+
 // static
 Application * Application::instance()
 {
@@ -61,7 +66,8 @@ Application::Application()
     : m_ioservice(new boost::asio::io_service()),
     m_work(new boost::asio::io_service::work(*m_ioservice)),
     m_returnCode(0),
-    m_closingDown(false)
+    m_closingDown(false),
+    m_uahfState(UAHFDisabled)
 {
     init();
 }
@@ -86,18 +92,15 @@ void Application::init()
         });
     }
 
-    const std::string chain = Params().NetworkIDString();
-    m_uahfStartTme = std::max<int64_t>(0, GetArg("-uahfstarttime", (chain == CBaseChainParams::REGTEST ? 1296688602 :
-#if UAHF_CLIENT
-                                   1501590000)));
-#else
-                                   0)));
-#endif
-    if (m_uahfStartTme == 0)
+    const bool fallback = GetArg("-uahfstarttime", UAHF_CLIENT) > 0;
+    if (GetBoolArg("-uahf", fallback)) {
+        m_uahfState = UAHFWaiting;
+        const std::string chain = Params().NetworkIDString();
+        m_uahfStartTme = chain == CBaseChainParams::REGTEST ? 1296688602 : 1501590000;
+    } else {
         m_uahfState = UAHFDisabled;
-    else
-        m_uahfState = UAHFWaiting; // will be updated when the blocks-db is parsed.
-
+        m_uahfStartTme = 0;
+    }
     logInfo(8002) << "UAHF state:" << m_uahfState << "start time:" << m_uahfStartTme;
 }
 
