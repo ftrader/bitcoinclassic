@@ -3538,7 +3538,7 @@ bool LoadBlockIndexDB()
         return true;
     chainActive.SetTip(it->second);
 
-    if (Application::uahfChainState() != Application::UAHFDisabled) {
+    if (Application::uahfChainState() == Application::UAHFWaiting) {
         bool needsRollback = false;
         // check if we are indeed on the proper chain.
         int forkHeight = Params().uahfForkBlockHeight();
