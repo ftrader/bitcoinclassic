@@ -60,10 +60,14 @@ TestingSetup::TestingSetup(const std::string& chainName, BlocksDb bdb) : BasicTe
         boost::filesystem::create_directories(pathTemp / "regtest/blocks/index");
         boost::filesystem::create_directories(pathTemp / "blocks/index");
         mapArgs["-datadir"] = pathTemp.string();
-        if (bdb == BlocksDbInMemory)
+        if (bdb == BlocksDbInMemory) {
             Blocks::DB::createTestInstance(1<<20);
-        else
+        } else {
+#ifdef WIN32 // we open the Blocks/index multiple times that fails on Windows
+            assert(false);
+#endif
             Blocks::DB::createInstance(0, true);
+        }
         pcoinsdbview = new CCoinsViewDB(1 << 23, true);
         pcoinsTip = new CCoinsViewCache(pcoinsdbview);
         InitBlockIndex(chainparams);

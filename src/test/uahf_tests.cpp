@@ -89,6 +89,7 @@ static CBlock createBlock(CBlockIndex *parent, const std::vector<CTransaction>& 
 
 BOOST_FIXTURE_TEST_SUITE(UAHF, MyTestingFixture)
 
+#ifndef WIN32 // we open the Blocks/index multiple times that fails on Windows
 BOOST_AUTO_TEST_CASE(Test_Enabling)
 {
     mapArgs["-uahfstarttime"] = "0";
@@ -438,4 +439,5 @@ BOOST_AUTO_TEST_CASE(Test_transactionAcceptance)
     }
 }
 
+#endif
 BOOST_AUTO_TEST_SUITE_END()
