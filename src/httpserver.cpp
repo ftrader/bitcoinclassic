@@ -224,7 +224,7 @@ static bool InitHTTPAllowList()
     std::string strAllowed;
     BOOST_FOREACH (const CSubNet& subnet, rpc_allow_subnets)
         strAllowed += subnet.ToString() + " ";
-    LogPrint("http", "Allowing HTTP connections from: %s\n", strAllowed);
+    logCritical(Log::HTTP) << "Allowing HTTP connections from:" << strAllowed;
     return true;
 }
 
@@ -254,8 +254,8 @@ static void http_request_cb(struct evhttp_request* req, void* arg)
 {
     std::unique_ptr<HTTPRequest> hreq(new HTTPRequest(req));
 
-    LogPrint("http", "Received a %s request for %s from %s\n",
-             RequestMethodString(hreq->GetRequestMethod()), hreq->GetURI(), hreq->GetPeer().ToString());
+    logInfo(Log::HTTP) << "Received a" << RequestMethodString(hreq->GetRequestMethod()) << "request for"
+                       << hreq->GetURI() << "from" << hreq->GetPeer().ToString();
 
     // Early address-based allow check
     if (!ClientAllowed(hreq->GetPeer())) {
@@ -302,7 +302,7 @@ static void http_request_cb(struct evhttp_request* req, void* arg)
 /** Callback to reject HTTP requests after shutdown. */
 static void http_reject_request_cb(struct evhttp_request* req, void*)
 {
-    LogPrint("http", "Rejecting request while shutting down\n");
+    logDebug(Log::HTTP) << "Rejecting request while shutting down";
     evhttp_send_error(req, HTTP_SERVUNAVAIL, NULL);
 }
 
@@ -310,10 +310,10 @@ static void http_reject_request_cb(struct evhttp_request* req, void*)
 static void ThreadHTTP(struct event_base* base, struct evhttp* http)
 {
     RenameThread("bitcoin-http");
-    LogPrint("http", "Entering http event loop\n");
+    logDebug(Log::HTTP) << "Entering http event loop";
     event_base_dispatch(base);
     // Event loop will be interrupted by InterruptHTTPServer()
-    LogPrint("http", "Exited http event loop\n");
+    logDebug(Log::HTTP) << "Exited http event loop";
 }
 
 /** Bind HTTP server to specified addresses */
@@ -327,7 +327,7 @@ static bool HTTPBindAddresses(struct evhttp* http)
         endpoints.push_back(std::make_pair("::1", defaultPort));
         endpoints.push_back(std::make_pair("127.0.0.1", defaultPort));
         if (mapArgs.count("-rpcbind")) {
-            LogPrintf("WARNING: option -rpcbind was ignored because -rpcallowip was not specified, refusing to allow everyone to connect\n");
+            logCritical(Log::HTTP) << "WARNING: option -rpcbind was ignored because -rpcallowip was not specified, refusing to allow everyone to connect";
         }
     } else if (mapArgs.count("-rpcbind")) { // Specific bind address
         const std::vector<std::string>& vbind = mapMultiArgs["-rpcbind"];
@@ -344,12 +344,12 @@ static bool HTTPBindAddresses(struct evhttp* http)
 
     // Bind addresses
     for (std::vector<std::pair<std::string, uint16_t> >::iterator i = endpoints.begin(); i != endpoints.end(); ++i) {
-        LogPrint("http", "Binding RPC on address %s port %i\n", i->first, i->second);
+        logInfo(Log::HTTP) << "Binding RPC on address" << i->first << "port" << i->second;
         evhttp_bound_socket *bind_handle = evhttp_bind_socket_with_handle(http, i->first.empty() ? NULL : i->first.c_str(), i->second);
         if (bind_handle) {
             boundSockets.push_back(bind_handle);
         } else {
-            LogPrintf("Binding RPC on address %s port %i failed.\n", i->first, i->second);
+            logFatal(Log::HTTP) <<"Binding RPC on address" << i->first << "port" << i->second << "failed";
         }
     }
     return !boundSockets.empty();
@@ -358,7 +358,7 @@ static bool HTTPBindAddresses(struct evhttp* http)
 /** Simple wrapper to set thread name and run work queue */
 static void HTTPWorkQueueRun(WorkQueue<HTTPClosure>* queue)
 {
-    RenameThread("bitcoin-httpworker");
+    RenameThread("httpworker");
     queue->Run();
 }
 
@@ -369,10 +369,12 @@ static void libevent_log_cb(int severity, const char *msg)
 // EVENT_LOG_WARN was added in 2.0.19; but before then _EVENT_LOG_WARN existed.
 # define EVENT_LOG_WARN _EVENT_LOG_WARN
 #endif
-    if (severity >= EVENT_LOG_WARN) // Log warn messages and higher without debug category
-        LogPrintf("libevent: %s\n", msg);
-    else
-        LogPrint("libevent", "libevent: %s\n", msg);
+    switch (severity) {
+    case EVENT_LOG_DEBUG: logDebug(Log::LibEvent) << msg; break;
+    case EVENT_LOG_MSG: logInfo(Log::LibEvent) << msg; break;
+    case EVENT_LOG_WARN: logWarning(Log::LibEvent) << msg; break;
+    case EVENT_LOG_ERR: logCritical(Log::LibEvent) << msg; break;
+    }
 }
 
 bool InitHTTPServer()
@@ -386,9 +388,7 @@ bool InitHTTPServer()
     // Redirect libevent's logging to our own log
     event_set_log_callback(&libevent_log_cb);
 #if LIBEVENT_VERSION_NUMBER >= 0x02010100
-    // If -debug=libevent, set full libevent debugging.
-    // Otherwise, disable all libevent debugging.
-    if (Log::Manager::instance()->isEnabled(6009, Log::DebugLevel))
+    if (Log::Manager::instance()->isEnabled(Log::LibEvent, Log::DebugLevel))
         event_enable_debug_logging(EVENT_DBG_ALL);
     else
         event_enable_debug_logging(EVENT_DBG_NONE);
@@ -401,14 +401,14 @@ bool InitHTTPServer()
 
     base = event_base_new(); // XXX RAII
     if (!base) {
-        LogPrintf("Couldn't create an event_base: exiting\n");
+        logCritical(Log::LibEvent) << "Couldn't create an event_base: exiting";
         return false;
     }
 
     /* Create a new evhttp object to handle requests. */
     http = evhttp_new(base); // XXX RAII
     if (!http) {
-        LogPrintf("couldn't create evhttp. Exiting.\n");
+        logCritical(Log::LibEvent) << "couldn't create evhttp. Exiting.";
         event_base_free(base);
         return false;
     }
@@ -419,15 +419,15 @@ bool InitHTTPServer()
     evhttp_set_gencb(http, http_request_cb, NULL);
 
     if (!HTTPBindAddresses(http)) {
-        LogPrintf("Unable to bind any endpoint for RPC server\n");
+        logCritical(Log::LibEvent) << "Unable to bind any endpoint for RPC server";
         evhttp_free(http);
         event_base_free(base);
         return false;
     }
 
-    LogPrint("http", "Initialized HTTP server\n");
+    logCritical(Log::HTTP) << "Initialized HTTP server";
     int workQueueDepth = std::max((long)GetArg("-rpcworkqueue", DEFAULT_HTTP_WORKQUEUE), 1L);
-    LogPrintf("HTTP: creating work queue of depth %d\n", workQueueDepth);
+    logInfo(Log::HTTP) << "creating work queue of depth" << workQueueDepth;
 
     workQueue = new WorkQueue<HTTPClosure>(workQueueDepth);
     eventBase = base;
@@ -439,9 +439,9 @@ boost::thread threadHTTP;
 
 bool StartHTTPServer()
 {
-    LogPrint("http", "Starting HTTP server\n");
+    logInfo(Log::HTTP) << "Starting HTTP server";
     int rpcThreads = std::max((long)GetArg("-rpcthreads", DEFAULT_HTTP_THREADS), 1L);
-    LogPrintf("HTTP: starting %d worker threads\n", rpcThreads);
+    logInfo(Log::HTTP) << "starting" << rpcThreads << "worker threads";
     threadHTTP = boost::thread(boost::bind(&ThreadHTTP, eventBase, eventHTTP));
 
     for (int i = 0; i < rpcThreads; i++)
@@ -451,7 +451,7 @@ bool StartHTTPServer()
 
 void InterruptHTTPServer()
 {
-    LogPrint("http", "Interrupting HTTP server\n");
+    logCritical(Log::HTTP) << "Interrupting HTTP server";
     if (eventHTTP) {
         // Unlisten sockets
         BOOST_FOREACH (evhttp_bound_socket *socket, boundSockets) {
@@ -466,14 +466,14 @@ void InterruptHTTPServer()
 
 void StopHTTPServer()
 {
-    LogPrint("http", "Stopping HTTP server\n");
+    logCritical(Log::HTTP) << "Stopping HTTP server";
     if (workQueue) {
-        LogPrint("http", "Waiting for HTTP worker threads to exit\n");
+        logInfo(Log::HTTP) << "Waiting for HTTP worker threads to exit";
         workQueue->WaitExit();
         delete workQueue;
     }
     if (eventBase) {
-        LogPrint("http", "Waiting for HTTP event thread to exit\n");
+        logInfo(Log::HTTP) << "Waiting for HTTP event thread to exit";
         // Give event loop a few seconds to exit (to send back last RPC responses), then break it
         // Before this was solved with event_base_loopexit, but that didn't work as expected in
         // at least libevent 2.0.21 and always introduced a delay. In libevent
@@ -485,7 +485,7 @@ void StopHTTPServer()
 #else
         if (!threadHTTP.timed_join(boost::posix_time::milliseconds(2000))) {
 #endif
-            LogPrintf("HTTP event loop did not exit within allotted time, sending loopbreak\n");
+            logCritical(Log::HTTP) << "HTTP event loop did not exit within allotted time, sending loopbreak";
             event_base_loopbreak(eventBase);
             threadHTTP.join();
         }
@@ -498,7 +498,7 @@ void StopHTTPServer()
         event_base_free(eventBase);
         eventBase = 0;
     }
-    LogPrint("http", "Stopped HTTP server\n");
+    logCritical(Log::HTTP) << "Stopped HTTP server";
 }
 
 struct event_base* EventBase()
@@ -540,7 +540,7 @@ HTTPRequest::~HTTPRequest()
 {
     if (!replySent) {
         // Keep track of whether reply was sent to avoid request leaks
-        LogPrintf("%s: Unhandled request\n", __func__);
+        logDebug(Log::HTTP) << "Unhandled request";
         WriteReply(HTTP_INTERNAL, "Unhandled request");
     }
     // evhttpd cleans up the request, as long as a reply was sent.
@@ -645,7 +645,7 @@ HTTPRequest::RequestMethod HTTPRequest::GetRequestMethod()
 
 void RegisterHTTPHandler(const std::string &prefix, bool exactMatch, const HTTPRequestHandler &handler)
 {
-    LogPrint("http", "Registering HTTP handler for %s (exactmatch %d)\n", prefix, exactMatch);
+    logInfo(Log::HTTP) << "Registering HTTP handler for" << prefix << "exactmatch:" << exactMatch;
     pathHandlers.push_back(HTTPPathHandler(prefix, exactMatch, handler));
 }
 
@@ -656,9 +656,8 @@ void UnregisterHTTPHandler(const std::string &prefix, bool exactMatch)
     for (; i != iend; ++i)
         if (i->prefix == prefix && i->exactMatch == exactMatch)
             break;
-    if (i != iend)
-    {
-        LogPrint("http", "Unregistering HTTP handler for %s (exactmatch %d)\n", prefix, exactMatch);
+    if (i != iend) {
+        logInfo(Log::HTTP) << "Unregistering HTTP handler for" << prefix << "exactmatch:" << exactMatch;
         pathHandlers.erase(i);
     }
 }
