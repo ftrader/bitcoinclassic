@@ -7,8 +7,6 @@ disablewallet=1
 
 # make the cookie go to /etc/bitcoin
 rpccookiefile=/etc/bitcoin/.cookie
-# make sure the cookie is readable by users able to read /etc/bitcoin
-sysperms=1
 
 #  --rpcauth--
 #  There additionally is the config option "rpcauth" to allow
