@@ -54,7 +54,7 @@ struct TestingSetup: public BasicTestingSetup {
         BlocksDbOnDisk
     };
 
-    TestingSetup(const std::string& chainName = CBaseChainParams::MAIN, BlocksDb bdb = BlocksDbInMemory);
+    TestingSetup(const std::string& chainName = CBaseChainParams::MAIN);
     ~TestingSetup();
 };
 

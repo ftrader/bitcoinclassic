@@ -374,24 +374,6 @@ bool Blocks::DB::CacheAllBlockInfos()
 //       appendHeader(iter->second);
 //   }
 
-    if (Application::uahfChainState() != Application::UAHFDisabled) {
-        uint256 uahfStartBlockId;
-        bool found = Read(DB_UAHF_FORK_BLOCK, uahfStartBlockId);
-        if (found && !uahfStartBlockId.IsNull()) {
-            auto mi = Blocks::indexMap.find(uahfStartBlockId);
-            if (mi != Blocks::indexMap.end()) {
-                d->uahfStartBlock = mi->second;
-                d->updateUahfProperties();
-            }
-        }
-
-        if (Application::uahfChainState() != Application::UAHFActive) {
-            auto bi = chainActive.Tip();
-            if (bi && bi->GetMedianTimePast() >= Application::uahfStartTime())
-                    Application::setUahfChainState(Application::UAHFRulesActive);
-        }
-    }
-
     return true;
 }
 
@@ -479,15 +461,6 @@ const std::list<CBlockIndex *> &Blocks::DB::headerChainTips()
     return d->headerChainTips;
 }
 
-bool Blocks::DB::setUahfForkBlock(CBlockIndex *index)
-{
-    assert(index);
-    d->uahfStartBlock = index;
-    d->updateUahfProperties();
-
-    return Write(DB_UAHF_FORK_BLOCK, d->uahfStartBlock->GetBlockHash());
-}
-
 void Blocks::DB::loadConfig()
 {
     d->blocksDataDirs.clear();
@@ -499,18 +472,6 @@ void Blocks::DB::loadConfig()
             logCritical(4000) << "invalid blockdatadir passed. No 'blocks' subdir found, skipping:"<< dir;
         }
     }
-}
-
-void Blocks::DBPrivate::updateUahfProperties()
-{
-    assert(uahfStartBlock);
-    if (uahfStartBlock->pprev && uahfStartBlock->pprev->GetMedianTimePast() >= Application::uahfStartTime())
-        Application::setUahfChainState(Application::UAHFActive);
-}
-
-CBlockIndex *Blocks::DB::uahfForkBlock() const
-{
-    return d->uahfStartBlock;
 }
 
 

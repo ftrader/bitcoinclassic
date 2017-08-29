@@ -1385,7 +1385,7 @@ void static InvalidChainFound(CBlockIndex* pindexNew)
           tip->GetBlockHash().ToString(), chainActive.Height(), log(tip->nChainWork.getdouble())/log(2.0),
           DateTimeStrFormat("%Y-%m-%d %H:%M:%S", tip->GetBlockTime()));
     } else {
-        LogPrintf("%s:  Genesis rejected. This will not end well.\n", __func__);
+        logFatal(Log::Bitcoin) << "Genesis rejected. This will not end well.";
     }
 }
 
@@ -2157,7 +2157,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     } else if (Application::uahfChainState() == Application::UAHFRulesActive && pindex->pprev->GetMedianTimePast() >= Application::uahfStartTime()) {
         logInfo(8002) << "UAHF block found that activates the chain" << block.GetHash();
         // enable UAHF (aka BCC) on first block after the calculated timestamp
-        Blocks::DB::instance()->setUahfForkBlock(pindex); // this will update Application::uahfChainState
+        Application::setUahfChainState(Application::UAHFActive);
     }
 
 
@@ -2419,9 +2419,8 @@ bool static ConnectTip(CValidationState& state, const CChainParams& chainparams,
         pblock = &block;
     }
 
-    CBlockIndex *uahfForkBlock = Blocks::DB::instance()->uahfForkBlock();
-    if (Application::uahfChainState() == Application::UAHFRulesActive
-            || (uahfForkBlock && uahfForkBlock->nHeight == pindexNew->nHeight)) { // this is a new potential fork-block.
+    if (Application::uahfChainState() >= Application::UAHFRulesActive
+            && (Params().uahfForkBlockHeight() == pindexNew->nHeight)) { // this is the fork-block.
         // The uahf fork-block has to be larger than 1MB.
         const uint32_t minBlockSize = Params().GenesisBlock().nTime == Application::uahfStartTime() // no bigger block in default regtest setup.
                 && Params().NetworkIDString() == CBaseChainParams::REGTEST ? 0 : MAX_LEGACY_BLOCK_SIZE + 1;
@@ -2739,7 +2738,7 @@ bool InvalidateBlock(CValidationState& state, const Consensus::Params& consensus
     return true;
 }
 
-bool ReconsiderBlock(CValidationState& state, CBlockIndex *pindex) {
+bool ReconsiderBlock(CBlockIndex *pindex) {
     AssertLockHeld(cs_main);
 
     int nHeight = pindex->nHeight;
@@ -3542,13 +3541,15 @@ bool LoadBlockIndexDB()
         int forkHeight = Params().uahfForkBlockHeight();
         if (chainActive.Height() >= forkHeight) {
             CBlockIndex *forkBlock = chainActive[forkHeight];
-            if (Params().uahfForkBlockId() != forkBlock->GetBlockHash()) {
+            if (Params().uahfForkBlockId() == forkBlock->GetBlockHash()) {
+                Application::setUahfChainState(chainActive.Tip() == forkBlock ? Application::UAHFRulesActive: Application::UAHFActive);
+            } else {
                 logWarning(8002) << "The UAHF fork-block is not in the main chain";
                 needsRollback = true;
             }
         }
-        Application::setUahfChainState(Application::UAHFRulesActive);
         if (needsRollback) {
+            Application::setUahfChainState(Application::UAHFRulesActive);
             logCritical(8002) << "Detected your chain was not UAHF, will need to rollback to the fork-block!";
             if (forkHeight > 0)
                 logInfo(8002) << " Fork-block is at:" << forkHeight;
@@ -3576,6 +3577,8 @@ bool LoadBlockIndexDB()
             logInfo(8002) << "Waiting for fork block. UAHF rules active";
             pcoinsTip->Flush();
         }
+    } else {
+        assert(Application::uahfChainState() == Application::UAHFDisabled);
     }
 
     PruneBlockIndexCandidates();

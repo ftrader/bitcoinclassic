@@ -31,8 +31,6 @@ class DBPrivate {
 public:
     DBPrivate();
 
-    void updateUahfProperties();
-
     bool isReindexing;
 
     CChain headersChain;

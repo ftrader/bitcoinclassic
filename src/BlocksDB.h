@@ -93,9 +93,6 @@ public:
     const CChain &headerChain();
     const std::list<CBlockIndex*> & headerChainTips();
 
-    CBlockIndex *uahfForkBlock() const;
-    bool setUahfForkBlock(CBlockIndex *index);
-
     void loadConfig();
 
     /// \internal

@@ -35,7 +35,7 @@
 class MyTestingFixture : public TestingSetup
 {
 public:
-    MyTestingFixture() : TestingSetup(CBaseChainParams::REGTEST, BlocksDbOnDisk) {}
+    MyTestingFixture() : TestingSetup(CBaseChainParams::REGTEST) {}
 };
 
 static CBlockIndex *createBlockIndex(CBlockIndex *prev, int height, int time, uint256 *hash)
@@ -89,9 +89,9 @@ static CBlock createBlock(CBlockIndex *parent, const std::vector<CTransaction>& 
 
 BOOST_FIXTURE_TEST_SUITE(UAHF, MyTestingFixture)
 
-#ifndef WIN32 // we open the Blocks/index multiple times that fails on Windows
 BOOST_AUTO_TEST_CASE(Test_Enabling)
 {
+    mapArgs.erase("-uahf");
     mapArgs["-uahfstarttime"] = "0";
     MockApplication::doInit();
     BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFDisabled);
@@ -123,7 +123,6 @@ BOOST_AUTO_TEST_CASE(Test_Enabling)
     BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFWaiting);
     BOOST_CHECK_EQUAL(Application::uahfStartTime(), 1296688602);
 
-    BOOST_CHECK(Blocks::DB::instance()->uahfForkBlock() == nullptr);
     BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFWaiting);
 
     mapArgs.erase("-uahf");
@@ -140,57 +139,10 @@ BOOST_AUTO_TEST_CASE(Test_Enabling)
     chainActive.SetTip(tip);
     // tip GMTP is 20600, the one before 20500
 
-    Blocks::DB::instance()->setUahfForkBlock(tip);
-    BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFActive);
-    BOOST_CHECK(hashes[11] == tip->GetBlockHash());
-
     mapArgs["-uahfstarttime"] = "0";
     MockApplication::doInit();
     Blocks::DB::createInstance(0, false);
-    BOOST_CHECK(Blocks::DB::instance()->uahfForkBlock() == nullptr);
     BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFDisabled);
-
-    mapArgs["-uahfstarttime"] = "12352";
-    MockApplication::doInit();
-    MockApplication::setUAHFStartTime(12352);
-    Blocks::DB::createInstance(0, false);
-    Blocks::DB::instance()->CacheAllBlockInfos();
-    logDebug() << Blocks::DB::instance()->uahfForkBlock()->GetBlockHash() << hashes[11];
-    BOOST_CHECK(Blocks::DB::instance()->uahfForkBlock()->GetBlockHash() == hashes[11]);
-    BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFActive);
-
-    /* UAHF spec states;
-     * "activation time": once the MTP of the chain tip is equal to or greater
-     * than this time, the next block must be a valid fork block. The fork block
-     * and subsequent blocks built on it must satisfy the new consensus rules.
-     *
-     * "fork block": the first block built on top of a chain tip whose MTP is
-     * greater than or equal to the activation time.
-     */
-
-    // Defining UAHF starts at 20500 means the tip (being 20600) is our fork-block.
-    MockApplication::doInit();
-    MockApplication::setUAHFStartTime(20500);
-    Blocks::DB::createInstance(0, false);
-    Blocks::DB::instance()->CacheAllBlockInfos(); // this is the actual method we are checking.
-    BOOST_CHECK(Blocks::DB::instance()->uahfForkBlock()->GetBlockHash() == hashes[11]);
-    BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFActive);
-
-    // Defining UAHF starts at 20600 means the tip is the last one before the fork block.
-    MockApplication::doInit();
-    MockApplication::setUAHFStartTime(20600);
-    Blocks::DB::createInstance(0, false);
-    Blocks::DB::instance()->CacheAllBlockInfos();
-    BOOST_CHECK(Blocks::DB::instance()->uahfForkBlock()->GetBlockHash() == hashes[11]);
-    BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFRulesActive);
-
-    // Check for off-by-one sec
-    MockApplication::doInit();
-    MockApplication::setUAHFStartTime(20601);
-    Blocks::DB::createInstance(0, false);
-    Blocks::DB::instance()->CacheAllBlockInfos();
-    BOOST_CHECK(Blocks::DB::instance()->uahfForkBlock()->GetBlockHash() == hashes[11]);
-    BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFWaiting);
 }
 
 BOOST_AUTO_TEST_CASE(Test_BlockValidation)
@@ -322,7 +274,7 @@ BOOST_AUTO_TEST_CASE(Test_rollbackProtection)
     // create 20 block.
     CBlockIndex *tip = chainActive.Tip();
     BOOST_CHECK_EQUAL(tip->nHeight, 0);
-    mapArgs["-uahf"] = "false"; // turn off UAHF
+    mapArgs.erase("-uahf"); // turn off UAHF
     MockApplication::doInit();
 
     std::vector<CTransaction> transactions;
@@ -341,11 +293,9 @@ BOOST_AUTO_TEST_CASE(Test_rollbackProtection)
     }
 
     BOOST_CHECK_EQUAL(chainActive.Height(), 20);
-    mapArgs.erase("-uahf");
+    mapArgs["-uahf"] = "true";
     MockApplication::doInit();
     MockApplication::setUAHFStartTime(1296688702);
-    Blocks::DB::instance()->setUahfForkBlock(tip); // pretend our last one was the fork-block.
-    BOOST_CHECK_EQUAL(Application::uahfChainState(), Application::UAHFActive);
 
     std::vector<unsigned char> message;// to avoid the same identical blocks being mined, add a message.
     message.push_back('x');
@@ -439,5 +389,4 @@ BOOST_AUTO_TEST_CASE(Test_transactionAcceptance)
     }
 }
 
-#endif
 BOOST_AUTO_TEST_SUITE_END()

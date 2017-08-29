@@ -38,7 +38,8 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName)
         SetupEnvironment();
         SetupNetworking();
         mapArgs.clear();
-        mapArgs["checkblockindex"] = "1";
+        mapArgs["-checkblockindex"] = "1";
+        mapArgs["-uahf"] = "true";
         SelectParams(chainName);
         noui_connect();
     Log::Manager::instance()->loadDefaultTestSetup();
@@ -49,9 +50,13 @@ BasicTestingSetup::~BasicTestingSetup()
         ECC_Stop();
 }
 
-TestingSetup::TestingSetup(const std::string& chainName, BlocksDb bdb) : BasicTestingSetup(chainName)
+TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(chainName)
 {
+    MockApplication::doInit();
+    if (chainName == CBaseChainParams::REGTEST)
+        Application::setUahfChainState(Application::UAHFActive);
     const CChainParams& chainparams = Params();
+
 #ifdef ENABLE_WALLET
         bitdb.MakeMock();
 #endif
@@ -60,14 +65,7 @@ TestingSetup::TestingSetup(const std::string& chainName, BlocksDb bdb) : BasicTe
         boost::filesystem::create_directories(pathTemp / "regtest/blocks/index");
         boost::filesystem::create_directories(pathTemp / "blocks/index");
         mapArgs["-datadir"] = pathTemp.string();
-        if (bdb == BlocksDbInMemory) {
-            Blocks::DB::createTestInstance(1<<20);
-        } else {
-#ifdef WIN32 // we open the Blocks/index multiple times that fails on Windows
-            assert(false);
-#endif
-            Blocks::DB::createInstance(0, true);
-        }
+        Blocks::DB::createTestInstance(1<<20);
         pcoinsdbview = new CCoinsViewDB(1 << 23, true);
         pcoinsTip = new CCoinsViewCache(pcoinsdbview);
         InitBlockIndex(chainparams);
@@ -81,10 +79,6 @@ TestingSetup::TestingSetup(const std::string& chainName, BlocksDb bdb) : BasicTe
         for (int i=0; i < nScriptCheckThreads-1; i++)
             threadGroup.create_thread(&ThreadScriptCheck);
         RegisterNodeSignals(GetNodeSignals());
-
-    MockApplication::doInit();
-    if (chainName == CBaseChainParams::REGTEST)
-        Application::setUahfChainState(Application::UAHFActive);
 }
 
 TestingSetup::~TestingSetup()
