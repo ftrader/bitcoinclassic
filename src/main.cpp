@@ -234,8 +234,6 @@ struct CNodeState {
     int nMisbehavior;
     //! Whether this peer should be disconnected and banned (unless whitelisted).
     bool fShouldBan;
-    //! String name of this peer (debugging/logging purposes).
-    std::string name;
     //! List of asynchronously-determined block rejections to notify this peer about.
     std::vector<CBlockReject> rejects;
     //! The best known block we know this peer has announced.
@@ -308,7 +306,6 @@ void UpdatePreferredDownload(CNode* node, CNodeState* state)
 void InitializeNode(NodeId nodeid, const CNode *pnode) {
     LOCK(cs_main);
     CNodeState &state = mapNodeState.insert(std::make_pair(nodeid, CNodeState())).first->second;
-    state.name = pnode->addrName;
     state.address = pnode->addr;
 }
 
@@ -1365,10 +1362,11 @@ void Misbehaving(NodeId nodeId, int howmuch)
     state->nMisbehavior += howmuch;
     int banscore = GetArg("-banscore", DEFAULT_BANSCORE_THRESHOLD);
     if (state->nMisbehavior >= banscore && state->nMisbehavior - howmuch < banscore) {
-        LogPrintf("%s: %s, id:%d (%d -> %d) BAN THRESHOLD EXCEEDED\n", __func__, state->name, nodeId, state->nMisbehavior-howmuch, state->nMisbehavior);
+        logCritical(Log::Net) << "Id:" << nodeId << state->nMisbehavior-howmuch << "=>" <<  state->nMisbehavior
+                    << "Ban threshold exceeded";
         state->fShouldBan = true;
     } else {
-        LogPrintf("%s: %s (%d -> %d)\n", __func__, state->name, state->nMisbehavior-howmuch, state->nMisbehavior);
+        logWarning(Log::Net) << "Misbehaving" << "Id:" << nodeId << state->nMisbehavior-howmuch << "=>" << state->nMisbehavior;
     }
 }
 
@@ -2296,7 +2294,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
     nTimeBestReceived = GetTime();
     mempool.AddTransactionsUpdated(1);
 
-    logCritical(Log::Validation).nospace() << "new best=" << chainActive.Tip()->GetBlockHash() << " height=" << chainActive.Height()
+    logCritical(Log::Bitcoin).nospace() << "new best=" << chainActive.Tip()->GetBlockHash() << " height=" << chainActive.Height()
             << "  log2_work=" << log(chainActive.Tip()->nChainWork.getdouble())/log(2.0)
             << "  tx=" << chainActive.Tip()->nChainTx
             << "  date=" << DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()).c_str()
@@ -2323,7 +2321,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
                         fWarned = true;
                     }
                 } else {
-                    logCritical(Log::Validation) << "unknown new rules are about to activate. Versionbit:" << bit;
+                    logCritical(Log::Bitcoin) << "unknown new rules are about to activate. Versionbit:" << bit;
                 }
             }
         }
@@ -2335,7 +2333,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
             pindex = pindex->pprev;
         }
         if (nUpgraded > 0)
-            logWarning(Log::Validation) << nUpgraded << "of last 100 blocks have unexpected version";
+            logWarning(Log::Bitcoin) << nUpgraded << "of last 100 blocks have unexpected version";
         if (nUpgraded > 100/2)
         {
             // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
@@ -3582,7 +3580,7 @@ bool LoadBlockIndexDB()
 
     PruneBlockIndexCandidates();
 
-    logCritical(Log::Validation) << "LoadBlockIndexDB: hashBestChain:" << chainActive.Tip()->GetBlockHash()
+    logCritical(Log::Bitcoin) << "LoadBlockIndexDB: hashBestChain:" << chainActive.Tip()->GetBlockHash()
                                  << "height:" << chainActive.Height()
                                  << "date:" << DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime())
                                  << "progress:" <<  Checkpoints::GuessVerificationProgress(chainparams.Checkpoints(), chainActive.Tip());
@@ -4286,16 +4284,10 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
         }
 
         pfrom->fSuccessfullyConnected = true;
-
-        std::string remoteAddr;
-        if (fLogIPs)
-            remoteAddr = ", peeraddr=" + pfrom->addr.ToString();
-
-        logInfo(Log::Net) << "receive version message:" << pfrom->addr << pfrom->cleanSubVer << "version:"
-                          << pfrom->nVersion << "blocks:" << pfrom->nStartingHeight << "us:"
-                          << addrMe << "peer:" << pfrom->id << remoteAddr;
+        logCritical(Log::Net) << "receive version message:" << pfrom->addr << pfrom->cleanSubVer << "version:"
+                          << pfrom->nVersion << "blocks:" << pfrom->nStartingHeight << "id:" << pfrom->id;
         if (pfrom->isCashNode)
-            logInfo(Log::Net) << "peer" << pfrom->GetId() << "uses CASH message-headers";
+            logInfo(Log::Net) << "peer id:" << pfrom->GetId() << "uses CASH message-headers";
 
         int64_t nTimeOffset = nTime - GetTime();
         pfrom->nTimeOffset = nTimeOffset;

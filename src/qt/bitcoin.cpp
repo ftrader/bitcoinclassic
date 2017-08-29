@@ -84,7 +84,7 @@ Q_DECLARE_METATYPE(CAmount)
 
 static void InitMessage(const std::string &message)
 {
-    LogPrintf("init message: %s\n", message);
+    logCritical(Log::Bitcoin) << "init message:" << message;
 }
 
 /*

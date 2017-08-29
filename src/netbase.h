@@ -195,8 +195,8 @@ class CService : public CNetAddr
 inline Log::SilentItem operator<<(Log::SilentItem item, const CService&) { return item; }
 inline Log::Item operator<<(Log::Item item, const CService &s) {
     if (item.isEnabled())
-        item << s.ToString();
-    return item.maybespace();
+        item << s.ToString().c_str();
+    return item;
 }
 
 

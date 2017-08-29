@@ -50,7 +50,7 @@ public:
 Log::Manager::Manager()
     : d(new ManagerPrivate())
 {
-    d->sectionNames.emplace(Log::Validation, "Validation");
+    d->sectionNames.emplace(Log::Bitcoin, "Bitcoin");
     d->sectionNames.emplace(Log::Bench, "Bench");
     d->sectionNames.emplace(Log::Prune, "Prune");
     d->sectionNames.emplace(Log::Net, "Net");

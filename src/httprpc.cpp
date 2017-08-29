@@ -160,7 +160,7 @@ static bool HTTPReq_JSONRPC(HTTPRequest* req, const std::string &)
     }
 
     if (!RPCAuthorized(authHeader.second)) {
-        LogPrintf("ThreadRPCServer incorrect password attempt from %s\n", req->GetPeer().ToString());
+        logCritical(Log::RPC) << "ThreadRPCServer incorrect password attempt from" << req->GetPeer();
 
         /* Deter brute-forcing
            If this results in a DoS the user really
@@ -211,7 +211,7 @@ static bool InitRPCAuthentication()
 {
     if (mapArgs["-rpcpassword"] == "")
     {
-        LogPrintf("No rpcpassword set - using random cookie authentication\n");
+        logCritical(Log::RPC) << "No rpcpassword set - using random cookie authentication";
         if (!GenerateAuthCookie(&strRPCUserColonPass)) {
             uiInterface.ThreadSafeMessageBox(
                 _("Error: A fatal internal error occurred, see debug.log for details"), // Same message as AbortNode
@@ -219,7 +219,6 @@ static bool InitRPCAuthentication()
             return false;
         }
     } else {
-        LogPrintf("Config options rpcuser and rpcpassword will soon be deprecated. Locally-run instances may remove rpcuser to use cookie-based auth, or may be replaced with rpcauth. Please see share/rpcuser for rpcauth auth generation.\n");
         strRPCUserColonPass = mapArgs["-rpcuser"] + ":" + mapArgs["-rpcpassword"];
     }
     return true;
@@ -227,7 +226,7 @@ static bool InitRPCAuthentication()
 
 bool StartHTTPRPC()
 {
-    LogPrint("rpc", "Starting HTTP RPC server\n");
+    logCritical(Log::RPC) << "Starting HTTP RPC server";
     if (!InitRPCAuthentication())
         return false;
 
@@ -241,12 +240,12 @@ bool StartHTTPRPC()
 
 void InterruptHTTPRPC()
 {
-    LogPrint("rpc", "Interrupting HTTP RPC server\n");
+    logCritical(Log::RPC) << "Interrupting HTTP RPC server";
 }
 
 void StopHTTPRPC()
 {
-    LogPrint("rpc", "Stopping HTTP RPC server\n");
+    logCritical(Log::RPC) << "Stopping HTTP RPC server";
     UnregisterHTTPHandler("/", true);
     if (httpRPCTimerInterface) {
         RPCUnregisterTimerInterface(httpRPCTimerInterface);

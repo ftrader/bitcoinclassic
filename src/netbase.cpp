@@ -293,7 +293,7 @@ struct ProxyCredentials
 /** Connect using SOCKS5 (as described in RFC1928) */
 static bool Socks5(const std::string& strDest, int port, const ProxyCredentials *auth, SOCKET& hSocket)
 {
-    LogPrintf("SOCKS5 connecting %s\n", strDest);
+    logInfo(Log::Proxy) << "SOCKS5 connecting" << strDest;
     if (strDest.size() > 255) {
         CloseSocket(hSocket);
         return error("Hostname too long");
@@ -338,7 +338,7 @@ static bool Socks5(const std::string& strDest, int port, const ProxyCredentials 
             CloseSocket(hSocket);
             return error("Error sending authentication to proxy");
         }
-        LogPrint("proxy", "SOCKS5 sending proxy authentication %s:%s\n", auth->username, auth->password);
+        logInfo(Log::Proxy).nospace() << "SOCKS5 sending proxy authentication" << auth->username << ":" << auth->password;
         char pchRetA[2];
         if (!InterruptibleRecv(pchRetA, 2, SOCKS5_RECV_TIMEOUT, hSocket)) {
             CloseSocket(hSocket);
@@ -422,7 +422,7 @@ static bool Socks5(const std::string& strDest, int port, const ProxyCredentials 
         CloseSocket(hSocket);
         return error("Error reading from proxy");
     }
-    LogPrintf("SOCKS5 connected %s\n", strDest);
+    logInfo(Log::Proxy) << "SOCKS5 connected" << strDest;
     return true;
 }
 
@@ -433,7 +433,7 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
     struct sockaddr_storage sockaddr;
     socklen_t len = sizeof(sockaddr);
     if (!addrConnect.GetSockAddr((struct sockaddr*)&sockaddr, &len)) {
-        LogPrintf("Cannot connect to %s: unsupported network\n", addrConnect.ToString());
+        logWarning(Log::Net) << "Cannot connect to" << addrConnect << "unsupported network";
         return false;
     }
 
@@ -471,13 +471,13 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
             int nRet = select(hSocket + 1, NULL, &fdset, NULL, &timeout);
             if (nRet == 0)
             {
-                LogPrint("net", "connection to %s timeout\n", addrConnect.ToString());
+                logWarning(Log::Net) << "connection to" << addrConnect << "timeout";
                 CloseSocket(hSocket);
                 return false;
             }
             if (nRet == SOCKET_ERROR)
             {
-                LogPrintf("select() for %s failed: %s\n", addrConnect.ToString(), NetworkErrorString(WSAGetLastError()));
+                logWarning(Log::Net) << "select() for" << addrConnect << "failed:" << NetworkErrorString(WSAGetLastError());
                 CloseSocket(hSocket);
                 return false;
             }
@@ -488,13 +488,13 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
             if (getsockopt(hSocket, SOL_SOCKET, SO_ERROR, &nRet, &nRetSize) == SOCKET_ERROR)
 #endif
             {
-                LogPrintf("getsockopt() for %s failed: %s\n", addrConnect.ToString(), NetworkErrorString(WSAGetLastError()));
+                logWarning(Log::Net) << "getsockopt() for" << addrConnect << "failed:" << NetworkErrorString(WSAGetLastError());
                 CloseSocket(hSocket);
                 return false;
             }
             if (nRet != 0)
             {
-                LogPrintf("connect() to %s failed after select(): %s\n", addrConnect.ToString(), NetworkErrorString(nRet));
+                logWarning(Log::Net) << "connect() to" << addrConnect << "failed after select():" << NetworkErrorString(nRet);
                 CloseSocket(hSocket);
                 return false;
             }
@@ -505,7 +505,7 @@ bool static ConnectSocketDirectly(const CService &addrConnect, SOCKET& hSocketRe
         else
 #endif
         {
-            LogPrintf("connect() to %s failed: %s\n", addrConnect.ToString(), NetworkErrorString(WSAGetLastError()));
+            logWarning(Log::Net) << "connect() to" << addrConnect << "failed:" << NetworkErrorString(WSAGetLastError());
             CloseSocket(hSocket);
             return false;
         }

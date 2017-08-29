@@ -144,7 +144,7 @@ public:
             return CCoinsViewBacked::GetCoins(txid, coins);
         } catch(const std::runtime_error& e) {
             uiInterface.ThreadSafeMessageBox(_("Error reading from database, shutting down."), "", CClientUIInterface::MSG_ERROR);
-            LogPrintf("Error reading from database: %s\n", e.what());
+            logFatal(Log::DB) << "Error reading from database:" << e;
             // Starting the shutdown sequence and returning false to the caller would be
             // interpreted as 'entry not found' (as opposed to unable to read data), and
             // could lead to invalid interpretation. Just exit immediately, as we can't
@@ -412,76 +412,76 @@ void InitParameterInteraction()
     // even when -connect or -proxy is specified
     if (mapArgs.count("-bind")) {
         if (SoftSetBoolArg("-listen", true))
-            LogPrintf("%s: parameter interaction: -bind set -> setting -listen=1\n", __func__);
+            logCritical(Log::Net) << "parameter interaction: -bind set -> setting -listen=1";
     }
     if (mapArgs.count("-whitebind")) {
         if (SoftSetBoolArg("-listen", true))
-            LogPrintf("%s: parameter interaction: -whitebind set -> setting -listen=1\n", __func__);
+            logCritical(Log::Net) << "parameter interaction: -whitebind set -> setting -listen=1";
     }
 
     if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0) {
         // when only connecting to trusted nodes, do not seed via DNS, or listen by default
         if (SoftSetBoolArg("-dnsseed", false))
-            LogPrintf("%s: parameter interaction: -connect set -> setting -dnsseed=0\n", __func__);
+            logCritical(Log::Net) << "parameter interaction: -connect set -> setting -dnsseed=0";
         if (SoftSetBoolArg("-listen", false))
-            LogPrintf("%s: parameter interaction: -connect set -> setting -listen=0\n", __func__);
+            logCritical(Log::Net) << "parameter interaction: -connect set -> setting -listen=0";
     }
 
     if (mapArgs.count("-proxy")) {
         // to protect privacy, do not listen by default if a default proxy server is specified
         if (SoftSetBoolArg("-listen", false))
-            LogPrintf("%s: parameter interaction: -proxy set -> setting -listen=0\n", __func__);
+            logCritical(Log::Proxy) << "parameter interaction: -proxy set -> setting -listen=0";
         // to protect privacy, do not use UPNP when a proxy is set. The user may still specify -listen=1
         // to listen locally, so don't rely on this happening through -listen below.
         if (SoftSetBoolArg("-upnp", false))
-            LogPrintf("%s: parameter interaction: -proxy set -> setting -upnp=0\n", __func__);
+            logCritical(Log::Proxy) << "parameter interaction: -proxy set -> setting -upnp=0";
         // to protect privacy, do not discover addresses by default
         if (SoftSetBoolArg("-discover", false))
-            LogPrintf("%s: parameter interaction: -proxy set -> setting -discover=0\n", __func__);
+            logCritical(Log::Proxy) << "parameter interaction: -proxy set -> setting -discover=0";
     }
 
     if (!GetBoolArg("-listen", DEFAULT_LISTEN)) {
         // do not map ports or try to retrieve public IP when not listening (pointless)
         if (SoftSetBoolArg("-upnp", false))
-            LogPrintf("%s: parameter interaction: -listen=0 -> setting -upnp=0\n", __func__);
+            logCritical(Log::Net) << "parameter interaction: -listen=0 -> setting -upnp=0";
         if (SoftSetBoolArg("-discover", false))
-            LogPrintf("%s: parameter interaction: -listen=0 -> setting -discover=0\n", __func__);
+            logCritical(Log::Net) << "parameter interaction: -listen=0 -> setting -discover=0";
         if (SoftSetBoolArg("-listenonion", false))
-            LogPrintf("%s: parameter interaction: -listen=0 -> setting -listenonion=0\n", __func__);
+            logCritical(Log::Net) << "parameter interaction: -listen=0 -> setting -listenonion=0";
     }
 
     if (mapArgs.count("-externalip")) {
         // if an explicit public IP is specified, do not try to find others
         if (SoftSetBoolArg("-discover", false))
-            LogPrintf("%s: parameter interaction: -externalip set -> setting -discover=0\n", __func__);
+            logCritical(Log::Net) << "parameter interaction: -externalip set -> setting -discover=0";
     }
 
     if (GetBoolArg("-salvagewallet", false)) {
         // Rewrite just private keys: rescan to find transactions
         if (SoftSetBoolArg("-rescan", true))
-            LogPrintf("%s: parameter interaction: -salvagewallet=1 -> setting -rescan=1\n", __func__);
+            logCritical(Log::Wallet) << "parameter interaction: -salvagewallet=1 -> setting -rescan=1";
     }
 
     // -zapwallettx implies a rescan
     if (GetBoolArg("-zapwallettxes", false)) {
         if (SoftSetBoolArg("-rescan", true))
-            LogPrintf("%s: parameter interaction: -zapwallettxes=<mode> -> setting -rescan=1\n", __func__);
+            logCritical(Log::Wallet) << "parameter interaction: -zapwallettxes=<mode> -> setting -rescan=1";
     }
 
     // disable walletbroadcast and whitelistrelay in blocksonly mode
     if (GetBoolArg("-blocksonly", DEFAULT_BLOCKSONLY)) {
         if (SoftSetBoolArg("-whitelistrelay", false))
-            LogPrintf("%s: parameter interaction: -blocksonly=1 -> setting -whitelistrelay=0\n", __func__);
+            logCritical(Log::Net) << "parameter interaction: -blocksonly=1 -> setting -whitelistrelay=0";
 #ifdef ENABLE_WALLET
         if (SoftSetBoolArg("-walletbroadcast", false))
-            LogPrintf("%s: parameter interaction: -blocksonly=1 -> setting -walletbroadcast=0\n", __func__);
+            logCritical(Log::Wallet) << "parameter interaction: -blocksonly=1 -> setting -walletbroadcast=0";
 #endif
     }
 
     // Forcing relay from whitelisted hosts implies we will accept relays from them in the first place.
     if (GetBoolArg("-whitelistforcerelay", DEFAULT_WHITELISTFORCERELAY)) {
         if (SoftSetBoolArg("-whitelistrelay", true))
-            LogPrintf("%s: parameter interaction: -whitelistforcerelay=1 -> setting -whitelistrelay=1\n", __func__);
+            logCritical(Log::Net) << "parameter interaction: -whitelistforcerelay=1 -> setting -whitelistrelay=1";
     }
 }
 
@@ -619,7 +619,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         if (nPruneTarget < MIN_DISK_SPACE_FOR_BLOCK_FILES) {
             return InitError(strprintf(_("Prune configured below the minimum of %d MiB.  Please use a higher number."), MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024));
         }
-        LogPrintf("Prune configured to target %uMiB on disk for block and undo files.\n", nPruneTarget / 1024 / 1024);
+        logCritical(Log::Prune).nospace() << "Prune configured to target " << nPruneTarget / 1024 / 1024
+                                          << "MiB on disk for block and undo files.";
         fPruneMode = true;
     }
 
@@ -763,15 +764,15 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         ShrinkDebugFile();
 
 #ifdef ENABLE_WALLET
-    LogPrintf("Using BerkeleyDB version %s\n", DbEnv::version(0, 0, 0));
+    logCritical(Log::Wallet) << "Using BerkeleyDB version" << DbEnv::version(0, 0, 0);
 #endif
-    LogPrintf("Startup time: %s\n", DateTimeStrFormat("%Y-%m-%d %H:%M:%S", GetTime()));
-    LogPrintf("Using data directory %s\n", strDataDir);
-    LogPrintf("Using config file %s\n", GetConfigFile().string());
-    LogPrintf("Using at most %i connections (%i file descriptors available)\n", nMaxConnections, nFD);
+    logCritical(Log::Bitcoin) << "Startup time:" << DateTimeStrFormat("%Y-%m-%d %H:%M:%S", GetTime());
+    logCritical(Log::Bitcoin) << "Using data directory" << strDataDir;
+    logCritical(Log::Bitcoin) << "Using config file" << GetConfigFile().string();
+    logInfo(Log::Net) << "Using at most" << nMaxConnections  << "connections.";
+    logInfo(Log::Internals) << nFD << "file descriptors available";
     std::ostringstream strErrors;
 
-    LogPrintf("Using %u threads for script verification\n", nScriptCheckThreads);
     if (nScriptCheckThreads) {
         for (int i=0; i<nScriptCheckThreads-1; i++)
             threadGroup.create_thread(&ThreadScriptCheck);
@@ -798,12 +799,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         Application::instance()->adminServer();
     }
 
-    int64_t nStart;
-
     // ********************************************************* Step 5: verify wallet database integrity
 #ifdef ENABLE_WALLET
     if (!fDisableWallet) {
-        LogPrintf("Using wallet %s\n", strWalletFile);
+        logCritical(Log::Wallet) << "Using wallet" << strWalletFile;
         uiInterface.InitMessage(_("Verifying wallet..."));
 
         std::string warningString;
@@ -842,6 +841,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     LogPrintf("* Using %.1fMiB for in-memory UTXO set\n", nCoinCacheUsage * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
+    int64_t nStart;
     while (!fLoaded) {
         bool fReset = fReindex;
         std::string strLoadError;
@@ -943,7 +943,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                     fReindex = true;
                     fRequestShutdown = false;
                 } else {
-                    LogPrintf("Aborted block database rebuild. Exiting.\n");
+                    logFatal(Log::Bitcoin) << "Aborted block database rebuild. Exiting.";
                     return false;
                 }
             } else {
@@ -957,10 +957,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // As the program has not fully started yet, Shutdown() is possibly overkill.
     if (fRequestShutdown)
     {
-        LogPrintf("Shutdown requested. Exiting.\n");
+        logFatal(Log::Bitcoin) << "Shutdown requested. Exiting.";
         return false;
     }
-    LogPrintf(" block index %15dms\n", GetTimeMillis() - nStart);
+    logInfo(Log::Bench).nospace() << "block index load took: " << GetTimeMillis() - nStart << "ms";
 
     boost::filesystem::path est_path = GetDataDir() / FEE_ESTIMATES_FILENAME;
     CAutoFile est_filein(fopen(est_path.string().c_str(), "rb"), SER_DISK, CLIENT_VERSION);
@@ -1090,21 +1090,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 
 
-
-
-
-
-
-
-
-
     // ********************************************************* Step 8: load wallet
 #ifdef ENABLE_WALLET
     if (fDisableWallet) {
         pwalletMain = NULL;
-        LogPrintf("Wallet disabled!\n");
+        logInfo(Log::Wallet) << "Wallet disabled!";
     } else {
-
         // needed to restore wallet transaction meta data after -zapwallettxes
         std::vector<CWalletTx> vWtx;
 
@@ -1117,13 +1108,11 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                 uiInterface.InitMessage(_("Error loading wallet.dat: Wallet corrupted"));
                 return false;
             }
-
             delete pwalletMain;
             pwalletMain = NULL;
         }
 
         uiInterface.InitMessage(_("Loading wallet..."));
-
         nStart = GetTimeMillis();
         bool fFirstRun = true;
         pwalletMain = new CWallet(strWalletFile);
@@ -1142,7 +1131,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             else if (nLoadWalletRet == DB_NEED_REWRITE)
             {
                 strErrors << _("Wallet needed to be rewritten: restart Bitcoin Classic to complete") << "\n";
-                LogPrintf("%s", strErrors.str());
+                logFatal(Log::Wallet) << strErrors.str();
                 return InitError(strErrors.str());
             }
             else
@@ -1180,16 +1169,16 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             pwalletMain->SetBestChain(chainActive.GetLocator());
         }
 
-        LogPrintf("%s", strErrors.str());
-        LogPrintf(" wallet      %15dms\n", GetTimeMillis() - nStart);
+        if (!strErrors.str().empty())
+            logFatal(Log::Wallet) << strErrors.str();
+        logInfo(Log::Wallet).nospace() << "wallet load took: " << GetTimeMillis() - nStart << "ms";
 
         RegisterValidationInterface(pwalletMain);
 
         CBlockIndex *pindexRescan = chainActive.Tip();
-        if (GetBoolArg("-rescan", false))
+        if (GetBoolArg("-rescan", false)) {
             pindexRescan = chainActive.Genesis();
-        else
-        {
+        } else {
             CWalletDB walletdb(strWalletFile);
             CBlockLocator locator;
             if (walletdb.ReadBestBlock(locator))
@@ -1197,8 +1186,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             else
                 pindexRescan = chainActive.Genesis();
         }
-        if (chainActive.Tip() && chainActive.Tip() != pindexRescan)
-        {
+        if (chainActive.Tip() && chainActive.Tip() != pindexRescan) {
             //We can't rescan beyond non-pruned blocks, stop and throw an error
             //this might happen if a user uses a old wallet within a pruned node
             // or if he ran -disablewallet for a longer time, then decided to re-enable
@@ -1213,24 +1201,22 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             }
 
             uiInterface.InitMessage(_("Rescanning..."));
-            LogPrintf("Rescanning last %i blocks (from block %i)...\n", chainActive.Height() - pindexRescan->nHeight, pindexRescan->nHeight);
+            logCritical(Log::Bitcoin) << "Rescanning last" << chainActive.Height() - pindexRescan->nHeight << "blocks. (from block"
+                        << pindexRescan->nHeight << ")...";
             nStart = GetTimeMillis();
             pwalletMain->ScanForWalletTransactions(pindexRescan, true);
-            LogPrintf(" rescan      %15dms\n", GetTimeMillis() - nStart);
+            logInfo(Log::Bench).nospace() << "rescan took: " << GetTimeMillis() - nStart << "ms";
             pwalletMain->SetBestChain(chainActive.GetLocator());
             nWalletDBUpdated++;
 
             // Restore wallet transaction metadata after -zapwallettxes=1
-            if (GetBoolArg("-zapwallettxes", false) && GetArg("-zapwallettxes", "1") != "2")
-            {
+            if (GetBoolArg("-zapwallettxes", false) && GetArg("-zapwallettxes", "1") != "2") {
                 CWalletDB walletdb(strWalletFile);
 
-                BOOST_FOREACH(const CWalletTx& wtxOld, vWtx)
-                {
+                BOOST_FOREACH(const CWalletTx& wtxOld, vWtx) {
                     uint256 hash = wtxOld.GetHash();
                     std::map<uint256, CWalletTx>::iterator mi = pwalletMain->mapWallet.find(hash);
-                    if (mi != pwalletMain->mapWallet.end())
-                    {
+                    if (mi != pwalletMain->mapWallet.end()) {
                         const CWalletTx* copyFrom = &wtxOld;
                         CWalletTx* copyTo = &mi->second;
                         copyTo->mapValue = copyFrom->mapValue;
@@ -1256,7 +1242,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // if pruning, unset the service bit and perform the initial blockstore prune
     // after any wallet rescanning has taken place.
     if (fPruneMode) {
-        LogPrintf("Unsetting NODE_NETWORK on prune mode\n");
+        logInfo(Log::Net) << "Unsetting NODE_NETWORK on prune mode";
         nLocalServices &= ~NODE_NETWORK;
         if (!fReindex) {
             uiInterface.InitMessage(_("Pruning blockstore..."));
@@ -1277,9 +1263,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     Blocks::DB::instance()->setIsReindexing(fReindex);
     Blocks::DB::startBlockImporter();
-    if (chainActive.Tip() == NULL) {
-        LogPrintf("Waiting for genesis block to be imported...\n");
-        while (!fRequestShutdown && chainActive.Tip() == NULL)
+    if (chainActive.Tip() == nullptr) {
+        logDebug("Waiting for genesis block to be imported...");
+        while (!fRequestShutdown && chainActive.Tip() == nullptr)
             MilliSleep(10);
     }
 
@@ -1294,12 +1280,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     RandAddSeedPerfmon();
 
     //// debug print
-    LogPrintf("mapBlockIndex.size() = %u\n",   Blocks::indexMap.size());
-    LogPrintf("nBestHeight = %d\n",                   chainActive.Height());
+    logDebug(Log::DB) << "mapBlockIndex.size() =" << Blocks::indexMap.size();
+    logDebug(Log::BlockValidation) << "nBestHeight =" << chainActive.Height();
 #ifdef ENABLE_WALLET
-    LogPrintf("setKeyPool.size() = %u\n",      pwalletMain ? pwalletMain->setKeyPool.size() : 0);
-    LogPrintf("mapWallet.size() = %u\n",       pwalletMain ? pwalletMain->mapWallet.size() : 0);
-    LogPrintf("mapAddressBook.size() = %u\n",  pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
+    logDebug(Log::Wallet) << "setKeyPool.size() =" << (pwalletMain ? pwalletMain->setKeyPool.size() : 0);
+    logDebug(Log::Wallet) << "mapWallet.size() =" << (pwalletMain ? pwalletMain->mapWallet.size() : 0);
+    logDebug(Log::Wallet) << "mapAddressBook.size() =" << (pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
 #endif
 
     if (GetBoolArg("-listenonion", DEFAULT_LISTEN_ONION))
@@ -1318,7 +1304,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         Mining::GenerateBitcoins(GetBoolArg("-gen", DEFAULT_GENERATE), GetArg("-genproclimit", DEFAULT_GENERATE_THREADS),
                                  chainparams, GetArg("-gencoinbase", ""));
     } catch (const std::exception &e) {
-        LogPrintf("Mining could not be activated. Reason: %s\n", e.what());
+        logCritical(Log::Bitcoin) << "Mining could not be activated. Reason: %s" << e.what();
     }
 
     // ********************************************************* Step 12: finished

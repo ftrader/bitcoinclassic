@@ -77,7 +77,7 @@ enum Verbosity {
 enum Sections {
     Global = 0,
 
-    Validation = 1000,
+    Bitcoin = 1000,
     BlockValidation,
     Bench,
     Prune,

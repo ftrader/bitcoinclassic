@@ -18,7 +18,7 @@ void HandleError(const leveldb::Status& status) throw(dbwrapper_error)
 {
     if (status.ok())
         return;
-    LogPrintf("%s\n", status.ToString());
+    logCritical(Log::DB) << status.ToString();
     if (status.IsCorruption())
         throw dbwrapper_error("Database corrupted");
     if (status.IsIOError())
@@ -58,16 +58,16 @@ CDBWrapper::CDBWrapper(const boost::filesystem::path& path, size_t nCacheSize, b
         options.env = penv;
     } else {
         if (fWipe) {
-            LogPrintf("Wiping LevelDB in %s\n", path.string());
+            logCritical(Log::DB) << "Wiping LevelDB in" << path.string();
             leveldb::Status result = leveldb::DestroyDB(path.string(), options);
             HandleError(result);
         }
         TryCreateDirectory(path);
-        LogPrintf("Opening LevelDB in %s\n", path.string());
+        logCritical(Log::DB) << "Opening LevelDB in" << path.string();
     }
     leveldb::Status status = leveldb::DB::Open(options, path.string(), &pdb);
     HandleError(status);
-    LogPrintf("Opened LevelDB successfully\n");
+    logInfo(Log::DB) << "Opened LevelDB successfully";
 
     // The base-case obfuscation key, which is a noop.
     obfuscate_key = std::vector<unsigned char>(OBFUSCATE_KEY_NUM_BYTES, '\000');
@@ -77,8 +77,7 @@ CDBWrapper::CDBWrapper(const boost::filesystem::path& path, size_t nCacheSize, b
     if (!key_exists && obfuscate && IsEmpty()) {
         assert(false); // we don't support obfuscating a new DB.
     }
-
-    LogPrintf("Using obfuscation key for %s: %s\n", path.string(), GetObfuscateKeyHex());
+    logInfo(Log::DB) << "Using obfuscation key for" << path.string() << ":" << GetObfuscateKeyHex();
 }
 
 CDBWrapper::~CDBWrapper()
