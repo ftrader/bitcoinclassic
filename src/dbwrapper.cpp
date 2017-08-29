@@ -75,15 +75,7 @@ CDBWrapper::CDBWrapper(const boost::filesystem::path& path, size_t nCacheSize, b
     bool key_exists = Read(OBFUSCATE_KEY_KEY, obfuscate_key);
 
     if (!key_exists && obfuscate && IsEmpty()) {
-        // Initialize non-degenerate obfuscation if it won't upset
-        // existing, non-obfuscated data.
-        std::vector<unsigned char> new_key = CreateObfuscateKey();
-
-        // Write `new_key` so we don't obfuscate the key with itself
-        Write(OBFUSCATE_KEY_KEY, new_key);
-        obfuscate_key = new_key;
-
-        LogPrintf("Wrote new obfuscate key for %s: %s\n", path.string(), GetObfuscateKeyHex());
+        assert(false); // we don't support obfuscating a new DB.
     }
 
     LogPrintf("Using obfuscation key for %s: %s\n", path.string(), GetObfuscateKeyHex());
