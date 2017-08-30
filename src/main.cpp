@@ -3543,6 +3543,7 @@ bool LoadBlockIndexDB()
             CBlockIndex *forkBlock = chainActive[forkHeight];
             if (Params().uahfForkBlockId() == forkBlock->GetBlockHash()) {
                 Application::setUahfChainState(chainActive.Tip() == forkBlock ? Application::UAHFRulesActive: Application::UAHFActive);
+                ReconsiderBlock(forkBlock); // keep this in for a couple of releases only.
             } else {
                 logWarning(8002) << "The UAHF fork-block is not in the main chain";
                 needsRollback = true;
