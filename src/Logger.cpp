@@ -69,6 +69,7 @@ Log::Manager::Manager()
     d->sectionNames.emplace(Log::Internals, "Internals");
     d->sectionNames.emplace(Log::Mempool, "Mempool");
     d->sectionNames.emplace(Log::Random, "Random");
+    d->sectionNames.emplace(Log::FeeEstimation, "fees");
     d->sectionNames.emplace(8002, "UAHF");
 
     // this is purely to be backwards compatible with the old style where the section was a string.
@@ -77,7 +78,6 @@ Log::Manager::Manager()
     d->categoryMapping.emplace("blk", Log::ExpeditedBlocks);
     d->categoryMapping.emplace("coindb", Log::Coindb);
     d->categoryMapping.emplace("db", Log::DB);
-    d->categoryMapping.emplace("estimatefee", 502);
     d->categoryMapping.emplace("http", Log::HTTP);
     d->categoryMapping.emplace("libevent", Log::LibEvent);
     d->categoryMapping.emplace("mempool", Log::Mempool);

@@ -102,6 +102,7 @@ enum Sections {
 
     Wallet = 5000,
     SelectCoins,
+    FeeEstimation,
 
     Internals = 6000,
     Mempool,
