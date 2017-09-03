@@ -1,8 +1,22 @@
-// Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2017 Tom Zander <tomz@freedommail.ch>
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+/*
+ * This file is part of the bitcoin-classic project
+ * Copyright (c) 2009-2010 Satoshi Nakamoto
+ * Copyright (c) 2009-2015 The Bitcoin Core developers
+ * Copyright (c) 2017 Tom Zander <tomz@freedommail.ch>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #ifndef BITCOIN_BLOCKSDB_H
 #define BITCOIN_BLOCKSDB_H
@@ -10,6 +24,7 @@
 #include "dbwrapper.h"
 
 #include <boost/unordered_map.hpp>
+#include <streaming/ConstBuffer.h>
 #include <string>
 #include <vector>
 
@@ -19,6 +34,7 @@ struct CDiskTxPos;
 struct CDiskBlockPos;
 class CChainParams;
 class uint256;
+class FastBlock;
 class CChain;
 
 //! -dbcache default (MiB)
@@ -77,6 +93,14 @@ public:
 
     bool isReindexing() const;
     bool setIsReindexing(bool fReindex);
+
+    enum BlockType {
+        ForwardBlock,
+        RevertBlock
+    };
+
+    FastBlock loadBlock(CDiskBlockPos pos, BlockType type = ForwardBlock);
+    Streaming::ConstBuffer loadBlockFile(int fileIndex, BlockType type = ForwardBlock);
 
     /**
      * @brief make the blocks-DB aware of a new header-only tip.

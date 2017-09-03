@@ -1,7 +1,22 @@
-// Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (C) 2017 Tom Zander <tomz@freedommail.ch>
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+/*
+ * This file is part of the bitcoin-classic project
+ * Copyright (c) 2009-2010 Satoshi Nakamoto
+ * Copyright (c) 2017 Tom Zander <tomz@freedommail.ch>
+ * Copyright (c) 2017 Calin Culianu <calin.culianu@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "BlocksDB.h"
 #include "BlocksDB_p.h"
@@ -15,6 +30,7 @@
 #include "uint256.h"
 #include <boost/thread.hpp>
 #include <boost/filesystem.hpp>
+#include <blockchain/Block.h>
 
 static const char DB_BLOCK_FILES = 'f';
 static const char DB_TXINDEX = 't';
@@ -364,6 +380,8 @@ bool Blocks::DB::CacheAllBlockInfos()
             break;
         }
     }
+    d->datafiles.resize(maxFile);
+    d->revertDatafiles.resize(maxFile);
 
     for (auto iter = Blocks::indexMap.begin(); iter != Blocks::indexMap.end(); ++iter) {
         iter->second->BuildSkip();
@@ -380,6 +398,83 @@ bool Blocks::DB::CacheAllBlockInfos()
 bool Blocks::DB::isReindexing() const
 {
     return d->isReindexing;
+}
+
+static FILE* OpenDiskFile(const CDiskBlockPos &pos, const char *prefix, bool fReadOnly)
+{
+    if (pos.IsNull())
+        return NULL;
+    boost::filesystem::path path = Blocks::getFilepathForIndex(pos.nFile, prefix);
+    boost::filesystem::create_directories(path.parent_path());
+    FILE* file = fopen(path.string().c_str(), "rb+");
+    if (!file && !fReadOnly)
+        file = fopen(path.string().c_str(), "wb+");
+    if (!file) {
+        LogPrintf("Unable to open file %s\n", path.string());
+        return NULL;
+    }
+    if (pos.nPos) {
+        if (fseek(file, pos.nPos, SEEK_SET)) {
+            LogPrintf("Unable to seek to position %u of %s\n", pos.nPos, path.string());
+            fclose(file);
+            return NULL;
+        }
+    }
+    return file;
+}
+
+FILE* Blocks::openFile(const CDiskBlockPos &pos, bool fReadOnly) {
+    return OpenDiskFile(pos, "blk", fReadOnly);
+}
+
+FILE* Blocks::openUndoFile(const CDiskBlockPos &pos, bool fReadOnly) {
+    return OpenDiskFile(pos, "rev", fReadOnly);
+}
+
+boost::filesystem::path Blocks::getFilepathForIndex(int fileIndex, const char *prefix, bool fFindHarder)
+{
+    auto path = GetDataDir() / "blocks" / strprintf("%s%05u.dat", prefix, fileIndex);
+    if (fFindHarder && !boost::filesystem::exists(path)) {
+        DBPrivate *d = Blocks::DB::instance()->priv();
+        for (const std::string &dir : d->blocksDataDirs) {
+            boost::filesystem::path alternatePath(dir);
+            alternatePath = alternatePath / "blocks" / strprintf("%s%05u.dat", prefix, fileIndex);
+            if (boost::filesystem::exists(alternatePath))
+                return alternatePath;
+        }
+    }
+    return path;
+}
+
+FastBlock Blocks::DB::loadBlock(CDiskBlockPos pos, BlockType type)
+{
+    FastBlock block;
+    if (pos.nPos < 4)
+        throw std::runtime_error("Blocks::loadBlock got Database corruption");
+
+    size_t fileSize;
+    auto buf = d->mapFile(pos.nFile, type, &fileSize);
+    if (buf.get() == nullptr)
+        return block;
+    if (pos.nPos >= fileSize)
+        throw std::runtime_error("position outside of file");
+    uint32_t blockSize = le32toh(*((uint32_t*)(buf.get() + pos.nPos - 4)));
+    if (pos.nPos + blockSize > fileSize)
+        throw std::runtime_error("block sized bigger than file");
+    return FastBlock(Streaming::ConstBuffer(buf, buf.get() + pos.nPos, buf.get() + pos.nPos + blockSize));
+}
+
+Streaming::ConstBuffer Blocks::DB::loadBlockFile(int fileIndex, BlockType type)
+{
+    try {
+        size_t fileSize;
+        auto buf = d->mapFile(fileIndex, type, &fileSize);
+        if (buf.get() == nullptr)
+            return Streaming::ConstBuffer(); // got pruned
+        return Streaming::ConstBuffer(buf, buf.get(), buf.get() + fileSize - 1);
+    } catch (const std::ios_base::failure &ex) {
+        return Streaming::ConstBuffer(); // file missing.
+    }
 }
 
 bool Blocks::DB::appendHeader(CBlockIndex *block)
@@ -477,57 +572,94 @@ void Blocks::DB::loadConfig()
 
 ///////////////////////////////////////////////
 
-static FILE* OpenDiskFile(const CDiskBlockPos &pos, const char *prefix, bool fReadOnly)
-{
-    if (pos.IsNull())
-        return NULL;
-    boost::filesystem::path path = Blocks::getFilepathForIndex(pos.nFile, prefix, fReadOnly);
-    boost::filesystem::create_directories(path.parent_path());
-    FILE* file = fopen(path.string().c_str(), "rb+");
-    if (!file && !fReadOnly)
-        file = fopen(path.string().c_str(), "wb+");
-    if (!file) {
-        LogPrintf("Unable to open file %s\n", path.string());
-        return NULL;
-    }
-    if (pos.nPos) {
-        if (fseek(file, pos.nPos, SEEK_SET)) {
-            LogPrintf("Unable to seek to position %u of %s\n", pos.nPos, path.string());
-            fclose(file);
-            return NULL;
-        }
-    }
-    return file;
-}
-
-FILE* Blocks::openFile(const CDiskBlockPos &pos, bool fReadOnly) {
-    return OpenDiskFile(pos, "blk", fReadOnly);
-}
-
-FILE* Blocks::openUndoFile(const CDiskBlockPos &pos, bool fReadOnly) {
-    return OpenDiskFile(pos, "rev", fReadOnly);
-}
-
-boost::filesystem::path Blocks::getFilepathForIndex(int fileIndex, const char *prefix, bool fFindHarder)
-{
-    auto path = GetDataDir() / "blocks" / strprintf("%s%05u.dat", prefix, fileIndex);
-    if (fFindHarder && !boost::filesystem::exists(path)) {
-        DBPrivate *d = Blocks::DB::instance()->priv();
-        for (const std::string &dir : d->blocksDataDirs) {
-            boost::filesystem::path alternatePath(dir);
-            alternatePath = alternatePath / "blocks" / strprintf("%s%05u.dat", prefix, fileIndex);
-            if (boost::filesystem::exists(alternatePath))
-                return alternatePath;
-        }
-    }
-    return path;
-}
-
-
-///////////////////////////////////////////////
-
 Blocks::DBPrivate::DBPrivate()
     : isReindexing(false),
       uahfStartBlock(nullptr)
 {
 }
+
+Blocks::DBPrivate::~DBPrivate()
+{
+    for (auto file : datafiles) {
+        delete file;
+    }
+    for (auto file : revertDatafiles) {
+        delete file;
+    }
+}
+
+std::shared_ptr<char> Blocks::DBPrivate::mapFile(int fileIndex, Blocks::DB::BlockType type, size_t *size_out)
+{
+    const bool useBlk = type == Blocks::DB::ForwardBlock;
+    std::vector<DataFile*> &list = useBlk ? datafiles : revertDatafiles;
+    const char *prefix = useBlk ? "blk" : "rev";
+
+    std::lock_guard<std::mutex> lock_(lock);
+    if ((int) list.size() <= fileIndex)
+        list.resize(fileIndex + 10);
+    DataFile *df = list.at(fileIndex);
+    if (df == nullptr) {
+        df = new DataFile();
+        list[fileIndex] = df;
+    }
+    std::shared_ptr<char> buf = df->buffer.lock();
+    if (buf.get() == nullptr) {
+        auto path = getFilepathForIndex(fileIndex, prefix);
+        df->file.open(path);
+        if (df->file.is_open()) {
+            auto cleanupLambda = [useBlk,fileIndex,df,this] (char *buf) {
+                {   // mutex scope...
+                    std::lock_guard<std::mutex> lockG(lock);
+                    std::vector<DataFile*> &list = useBlk ? datafiles : revertDatafiles;
+                    assert(fileIndex >= 0 && fileIndex < (int) list.size());
+                    if (df == list[fileIndex])
+                        // invalidate entry -- note that it's possible
+                        // df != list[fileIndex] if fileHasGrown()
+                        // was called for this fileIndex.
+                        list[fileIndex] = nullptr;
+                }
+                // no need to hold lock on delete -- auto-closes mmap'd file.
+                delete df;
+            };
+            buf = std::shared_ptr<char>(const_cast<char*>(df->file.data()),
+                                        cleanupLambda);
+            df->buffer = std::weak_ptr<char>(buf);
+            df->filesize = df->file.size();
+        } else {
+            logCritical(Log::DB) << "Blocks::loadBlock: failed to memmap data-file"
+                    << path.string();
+        }
+    }
+    if (size_out) *size_out = df->filesize;
+    return buf;
+}
+
+// called by file write code to make new buffers returned after a file write
+// correspond to new mmap's of the right size.
+void Blocks::DBPrivate::fileHasGrown(int fileIndex)
+{
+    std::lock_guard<std::mutex> lock_(lock);
+    if (fileIndex < 0 || fileIndex >= int(datafiles.size()))
+        // silently ignore invalid usage as it creates no harm
+        return;
+    // unconditionally invalidate the pointer.
+    // This doesn't leak memory because if ptr existed, there are
+    // extant shard_ptr buffers.  When they get deleted, ptr will also.
+    // (see cleanupLambda in mapFile() above)
+    datafiles[fileIndex] = nullptr;
+}
+
+void Blocks::DBPrivate::revertFileHasGrown(int fileIndex)
+{
+    std::lock_guard<std::mutex> lock_(lock);
+    if (fileIndex < 0 || fileIndex >= int(revertDatafiles.size()))
+        // silently ignore invalid usage as it creates no harm
+        return;
+    // unconditionally invalidate the pointer.
+    // This doesn't leak memory because if ptr existed, there are
+    // extant shard_ptr buffers.  When they get deleted, ptr will also.
+    // (see cleanupLambda in mapFile() above)
+    revertDatafiles[fileIndex] = nullptr;
+}
+
+///////////////////////////////////////////////
