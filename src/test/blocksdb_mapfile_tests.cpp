@@ -1,6 +1,7 @@
 /*
  * This file is part of the bitcoin-classic project
  * Copyright (C) 2017 Calin Culianu <calin.culianu@gmail.com>
+ * Copyright (C) 2017 Tom Zander <tomz@freedommail.ch>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,18 +17,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "util.h"
 #include "test/test_bitcoin.h"
+
+#include <BlocksDB.h>
+#include <BlocksDB_p.h>
+#include <main.h>
+#include <util.h>
+#include <streaming/BufferPool.h>
+#include <blockchain/Block.h>
 
 #include <boost/test/unit_test.hpp>
 
-#include "BlocksDB_p.h"
-#include "BlocksDB.h"
-
-#ifndef WIN32
 
 BOOST_FIXTURE_TEST_SUITE(blocksdb_mapfile_tests, TestingSetup)
 
+#ifndef WIN32
 static void writeToFiles(int nFiles, size_t n2w, size_t atPos) {
     for (int i = 0; i < nFiles; ++i) {
         CDiskBlockPos pos(i,atPos);
@@ -101,6 +105,75 @@ BOOST_AUTO_TEST_CASE(mapFile_extendFile_test)
     }
 
 }
+#endif
+
+BOOST_AUTO_TEST_CASE(mapFile_write)
+{
+    // There likely is one already, for the genesis block, lets avoid interacting with it and just force a new file.
+    BOOST_CHECK_EQUAL(vinfoBlockFile.size(), 1);
+    vinfoBlockFile[0].nSize = MAX_BLOCKFILE_SIZE - 107;
+
+    Blocks::DB *db = Blocks::DB::instance();
+    Streaming::BufferPool pool;
+    pool.reserve(100);
+    for (int i = 0; i < 100; ++i) {
+        pool.begin()[i] = static_cast<char>(i);
+    }
+    FastBlock block(pool.commit(100));
+    BOOST_CHECK_EQUAL(block.size(), 100);
+    BOOST_CHECK_EQUAL(block.blockVersion(), 0x3020100);
+    {
+        FastBlock newBlock = db->writeBlock(1, block);
+        BOOST_CHECK_EQUAL(newBlock.blockVersion(), 0x3020100);
+        BOOST_CHECK_EQUAL(newBlock.size(), 100);
+    }
+    {
+        FastBlock block2 = db->loadBlock(CDiskBlockPos(1, 8));
+        BOOST_CHECK_EQUAL(block2.size(), 100);
+        BOOST_CHECK_EQUAL(block2.blockVersion(), 0x3020100);
+    }
+
+    // add a second block
+    pool.reserve(120);
+    for (int i = 0; i < 120; ++i) {
+        pool.begin()[i] = static_cast<char>(i + 1);
+    }
+    FastBlock block2(pool.commit(120));
+    BOOST_CHECK_EQUAL(block2.size(), 120);
+    BOOST_CHECK_EQUAL(block2.blockVersion(), 0x4030201);
+
+    {
+        FastBlock newBlock = db->writeBlock(2, block2);
+        BOOST_CHECK_EQUAL(newBlock.size(), 120);
+        BOOST_CHECK_EQUAL(newBlock.blockVersion(), 0x4030201);
+    }
+    {
+        FastBlock block3 = db->loadBlock(CDiskBlockPos(1, 8));
+        BOOST_CHECK_EQUAL(block3.size(), 100);
+        BOOST_CHECK_EQUAL(block3.blockVersion(), 0x3020100);
+        BOOST_CHECK_EQUAL(block3.data().begin()[99], (char) 99);
+
+        FastBlock block4 = db->loadBlock(CDiskBlockPos(1, 116));
+        BOOST_CHECK_EQUAL(block4.size(), 120);
+        BOOST_CHECK_EQUAL(block4.blockVersion(), 0x4030201);
+        BOOST_CHECK(block4.data().begin()[119] == 120);
+    }
+
+    pool.reserve(1E6);
+    FastBlock big = pool.commit(1E6);
+
+    int remapLeft = BLOCKFILE_CHUNK_SIZE - 120 - 100;
+    while (remapLeft > 0) {
+        // at one point we will be auto-extending the file.
+        db->writeBlock(5, big);
+        remapLeft -= big.size();
+    }
+
+    {
+        FastBlock newBlock = db->writeBlock(6, block2);
+        BOOST_CHECK_EQUAL(newBlock.size(), 120);
+        BOOST_CHECK_EQUAL(newBlock.blockVersion(), 0x4030201);
+    }
+}
 
 BOOST_AUTO_TEST_SUITE_END()
-#endif

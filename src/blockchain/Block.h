@@ -94,6 +94,11 @@ public:
     static FastBlock fromOldBlock(const CBlockHeader &block, Streaming::BufferPool *pool = 0);
     static FastBlock fromOldBlock(const CBlock &block, Streaming::BufferPool *pool = 0);
 
+    /// \internal
+    inline Streaming::ConstBuffer data() const {
+        return m_data;
+    }
+
 private:
     Streaming::ConstBuffer m_data;
     std::vector<Tx> m_transactions;

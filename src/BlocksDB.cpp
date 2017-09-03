@@ -30,6 +30,7 @@
 #include "uint256.h"
 #include <boost/thread.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 #include <blockchain/Block.h>
 
 static const char DB_BLOCK_FILES = 'f';
@@ -477,6 +478,60 @@ Streaming::ConstBuffer Blocks::DB::loadBlockFile(int fileIndex, BlockType type)
     }
 }
 
+FastBlock Blocks::DB::writeBlock(int blockHeight, const FastBlock &block, BlockType type)
+{
+    assert(block.isFullBlock());
+    const int blockSize = block.size();
+    assert(blockSize < (int) MAX_BLOCKFILE_SIZE - 8);
+    LOCK(cs_LastBlockFile);
+    if ((int) vinfoBlockFile.size() <= nLastBlockFile)
+        vinfoBlockFile.resize(nLastBlockFile + 1);
+    if (vinfoBlockFile[nLastBlockFile].nSize + blockSize + 8 > MAX_BLOCKFILE_SIZE) {
+        // create a new file.
+        const bool useBlk = type == Blocks::DB::ForwardBlock;
+        const auto path = getFilepathForIndex(nLastBlockFile + 1, useBlk ? "blk" : "rev");
+        logDebug(Log::DB) << "Starting new file" << path.string();
+        size_t newFileSize = std::max(blockSize, (int) (useBlk ? BLOCKFILE_CHUNK_SIZE : UNDOFILE_CHUNK_SIZE));
+#ifdef WIN32
+        // due to the fact that on Windows we can't re-map, we skip the growing steps.
+        newFileSize = MAX_BLOCKFILE_SIZE;
+#endif
+        boost::filesystem::ofstream file(path);
+        file.close();
+        boost::filesystem::resize_file(path, newFileSize);
+
+        vinfoBlockFile.resize(++nLastBlockFile + 1);
+    }
+    CBlockFileInfo &info = vinfoBlockFile[nLastBlockFile];
+
+    size_t fileSize;
+    auto buf = d->mapFile(nLastBlockFile, type, &fileSize);
+    if (buf.get() == nullptr)
+        throw std::runtime_error("Failed to open file");
+#ifndef WIN32
+    if (vinfoBlockFile[nLastBlockFile].nSize + blockSize + 8 > fileSize) {
+        const bool useBlk = type == Blocks::DB::ForwardBlock;
+        const auto path = getFilepathForIndex(nLastBlockFile, useBlk ? "blk" : "rev");
+        logDebug(Log::DB) << "File" << path.string() << "needs to be resized";
+        const size_t newFileSize = fileSize + (useBlk ? BLOCKFILE_CHUNK_SIZE : UNDOFILE_CHUNK_SIZE);
+        boost::filesystem::resize_file(path, newFileSize);
+        d->fileHasGrown(nLastBlockFile);
+        buf = d->mapFile(nLastBlockFile, type, &fileSize);
+    }
+#endif
+    char *data = buf.get() + info.nSize;
+    memcpy(data, Params().MessageStart(), 4);
+    data += 4;
+    uint32_t networkSize = htole32(blockSize);
+    memcpy(data, &networkSize, 4);
+    data += 4;
+    memcpy(data, block.data().begin(), blockSize);
+    info.AddBlock(blockHeight, block.timestamp());
+    info.nSize += blockSize + 8;
+    setDirtyFileInfo.insert(nLastBlockFile);
+    return FastBlock(Streaming::ConstBuffer(buf, data, data + blockSize));
+}
+
 bool Blocks::DB::appendHeader(CBlockIndex *block)
 {
     assert(block);
@@ -605,7 +660,10 @@ std::shared_ptr<char> Blocks::DBPrivate::mapFile(int fileIndex, Blocks::DB::Bloc
     std::shared_ptr<char> buf = df->buffer.lock();
     if (buf.get() == nullptr) {
         auto path = getFilepathForIndex(fileIndex, prefix);
-        df->file.open(path);
+        auto mode = std::ios_base::binary | std::ios_base::in;
+        if (fileIndex == nLastBlockFile) // limit writable bit only to the last file.
+            mode |= std::ios_base::out;
+        df->file.open(path, mode);
         if (df->file.is_open()) {
             auto cleanupLambda = [useBlk,fileIndex,df,this] (char *buf) {
                 {   // mutex scope...
@@ -621,8 +679,7 @@ std::shared_ptr<char> Blocks::DBPrivate::mapFile(int fileIndex, Blocks::DB::Bloc
                 // no need to hold lock on delete -- auto-closes mmap'd file.
                 delete df;
             };
-            buf = std::shared_ptr<char>(const_cast<char*>(df->file.data()),
-                                        cleanupLambda);
+            buf = std::shared_ptr<char>(const_cast<char*>(df->file.const_data()), cleanupLambda);
             df->buffer = std::weak_ptr<char>(buf);
             df->filesize = df->file.size();
         } else {

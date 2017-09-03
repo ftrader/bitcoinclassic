@@ -34,7 +34,7 @@ namespace Blocks {
 
 struct DataFile {
     DataFile() : filesize(0) {}
-    boost::iostreams::mapped_file_source file;
+    boost::iostreams::mapped_file file;
     std::weak_ptr<char> buffer;
     int filesize;
 };

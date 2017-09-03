@@ -101,6 +101,7 @@ public:
 
     FastBlock loadBlock(CDiskBlockPos pos, BlockType type = ForwardBlock);
     Streaming::ConstBuffer loadBlockFile(int fileIndex, BlockType type = ForwardBlock);
+    FastBlock writeBlock(int blockHeight, const FastBlock &block, BlockType type = ForwardBlock);
 
     /**
      * @brief make the blocks-DB aware of a new header-only tip.
