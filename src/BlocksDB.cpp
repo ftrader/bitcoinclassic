@@ -389,12 +389,11 @@ bool Blocks::DB::appendHeader(CBlockIndex *block)
     bool found = false;
     const bool valid = (block->nStatus & BLOCK_FAILED_MASK) == 0;
     assert(valid || block->pprev);  // can't mark the genesis as invalid.
+    if (valid && d->headersChain.Contains(block)) // nothing to do.
+        return false;
     for (auto i = d->headerChainTips.begin(); i != d->headerChainTips.end(); ++i) {
         CBlockIndex *tip = *i;
-        CBlockIndex *parent = block;
-        while (parent && parent->nHeight > tip->nHeight) {
-            parent = parent->pprev;
-        }
+        CBlockIndex *parent = block->GetAncestor(tip->nHeight);
         if (parent == tip) {
             if (!valid)
                 block = block->pprev;
