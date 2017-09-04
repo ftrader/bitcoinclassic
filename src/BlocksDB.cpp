@@ -368,11 +368,9 @@ bool Blocks::DB::CacheAllBlockInfos()
     for (auto iter = Blocks::indexMap.begin(); iter != Blocks::indexMap.end(); ++iter) {
         iter->second->BuildSkip();
     }
-//   according to reports (github issue 276) this is too slow for some reason. Lets
-//   turn this off for now.
-//   for (auto iter = Blocks::indexMap.begin(); iter != Blocks::indexMap.end(); ++iter) {
-//       appendHeader(iter->second);
-//   }
+    for (auto iter = Blocks::indexMap.begin(); iter != Blocks::indexMap.end(); ++iter) {
+        appendHeader(iter->second);
+    }
 
     return true;
 }
