@@ -444,8 +444,8 @@ void SelectParams(const std::string& network)
 
 const CMessageHeader::MessageStartChars &CChainParams::magic() const
 {
-    const bool uahfEnabled = GetArg("-uahfstarttime", UAHF_CLIENT) > 0;
-    if (uahfEnabled)
+    const bool fallback = GetArg("-uahfstarttime", UAHF_CLIENT) > 0;
+    if (GetBoolArg("-uahf", fallback))
         return pchMessageStartCash;
     return pchMessageStart;
 }
