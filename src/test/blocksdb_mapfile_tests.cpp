@@ -22,9 +22,11 @@
 #include <BlocksDB.h>
 #include <BlocksDB_p.h>
 #include <main.h>
+#include <undo.h>
 #include <util.h>
 #include <streaming/BufferPool.h>
 #include <blockchain/Block.h>
+#include <blockchain/UndoBlock.h>
 
 #include <boost/test/unit_test.hpp>
 
@@ -65,9 +67,9 @@ BOOST_AUTO_TEST_CASE(mapFile_extendFile_test)
 
     for (int i = 0; i < nFiles; ++i) {
         size_t filesz, filesz2;
-        auto buf = pvt.mapFile(i, Blocks::DB::ForwardBlock, &filesz);
+        auto buf = pvt.mapFile(i, Blocks::ForwardBlock, &filesz);
         //LogPrintf("%d got size %d\n", i, int(filesz));
-        auto buf2 = pvt.mapFile(i, Blocks::DB::ForwardBlock, &filesz2);
+        auto buf2 = pvt.mapFile(i, Blocks::ForwardBlock, &filesz2);
         //LogPrintf("%d (second) got size %d\n", i, int(filesz2));
         BOOST_CHECK(filesz == filesz2);
         BOOST_CHECK(buf.get() != nullptr && buf.get()[filesz-1] == char(i%128));
@@ -82,8 +84,8 @@ BOOST_AUTO_TEST_CASE(mapFile_extendFile_test)
 
     for (int i = 1; i < nFiles; ++i) {
         size_t filesz, filesz_old;
-        auto buf = pvt2.mapFile(i, Blocks::DB::ForwardBlock, &filesz);
-        auto buf_old = pvt.mapFile(i, Blocks::DB::ForwardBlock, &filesz_old);
+        auto buf = pvt2.mapFile(i, Blocks::ForwardBlock, &filesz);
+        auto buf_old = pvt.mapFile(i, Blocks::ForwardBlock, &filesz_old);
         //LogPrintf("%d got size %d expected %d, old=%d\n", i, int(filesz), int(expected_size), int(filesz_old));
         BOOST_CHECK(filesz == expected_size);
         BOOST_CHECK(filesz_old < filesz);
@@ -93,7 +95,7 @@ BOOST_AUTO_TEST_CASE(mapFile_extendFile_test)
 
     for (int i = 1; i < nFiles; ++i) {
         size_t filesz;
-        auto buf = pvt.mapFile(i, Blocks::DB::ForwardBlock, &filesz); // should pickup *NEW* size now
+        auto buf = pvt.mapFile(i, Blocks::ForwardBlock, &filesz); // should pickup *NEW* size now
 
         //LogPrintf("%d got size %d expected %d, old=%d\n", i, int(filesz), int(expected_size), int(filesz_old));
         BOOST_CHECK(filesz == expected_size);
@@ -122,10 +124,13 @@ BOOST_AUTO_TEST_CASE(mapFile_write)
     FastBlock block(pool.commit(100));
     BOOST_CHECK_EQUAL(block.size(), 100);
     BOOST_CHECK_EQUAL(block.blockVersion(), 0x3020100);
+    CDiskBlockPos pos;
     {
-        FastBlock newBlock = db->writeBlock(1, block);
+        FastBlock newBlock = db->writeBlock(1, block, pos);
         BOOST_CHECK_EQUAL(newBlock.blockVersion(), 0x3020100);
         BOOST_CHECK_EQUAL(newBlock.size(), 100);
+        BOOST_CHECK_EQUAL(pos.nFile, 1);
+        BOOST_CHECK_EQUAL(pos.nPos, 8);
     }
     {
         FastBlock block2 = db->loadBlock(CDiskBlockPos(1, 8));
@@ -143,8 +148,10 @@ BOOST_AUTO_TEST_CASE(mapFile_write)
     BOOST_CHECK_EQUAL(block2.blockVersion(), 0x4030201);
 
     {
-        FastBlock newBlock = db->writeBlock(2, block2);
+        FastBlock newBlock = db->writeBlock(2, block2, pos);
         BOOST_CHECK_EQUAL(newBlock.size(), 120);
+        BOOST_CHECK_EQUAL(pos.nFile, 1);
+        BOOST_CHECK_EQUAL(pos.nPos, 116);
         BOOST_CHECK_EQUAL(newBlock.blockVersion(), 0x4030201);
     }
     {
@@ -165,14 +172,47 @@ BOOST_AUTO_TEST_CASE(mapFile_write)
     int remapLeft = BLOCKFILE_CHUNK_SIZE - 120 - 100;
     while (remapLeft > 0) {
         // at one point we will be auto-extending the file.
-        db->writeBlock(5, big);
+        db->writeBlock(5, big, pos);
         remapLeft -= big.size();
     }
 
     {
-        FastBlock newBlock = db->writeBlock(6, block2);
+        FastBlock newBlock = db->writeBlock(6, block2, pos);
         BOOST_CHECK_EQUAL(newBlock.size(), 120);
         BOOST_CHECK_EQUAL(newBlock.blockVersion(), 0x4030201);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(mapFile_writeUndo)
+{
+    BOOST_CHECK_EQUAL(vinfoBlockFile.size(), 1);
+    vinfoBlockFile[0].nSize = MAX_BLOCKFILE_SIZE - 107;
+
+    Blocks::DB *db = Blocks::DB::instance();
+    Streaming::BufferPool pool;
+
+    CBlockUndo undoBlock;
+    CTxInUndo in = { { 10, CScript() }, false, 10, 3 };
+    CTxUndo tx;
+    tx.vprevout.push_back(in);
+    undoBlock.vtxundo.push_back(tx);
+
+    FastUndoBlock block = FastUndoBlock::fromOldBlock(undoBlock);
+
+    BOOST_CHECK_EQUAL(block.size(), 6);
+    {
+        uint32_t pos;
+        FastUndoBlock newBlock = db->writeUndoBlock(block, 0, &pos);
+        BOOST_CHECK_EQUAL(newBlock.size(), 6);
+        BOOST_CHECK_EQUAL(pos, 8);
+    }
+    {
+        FastUndoBlock newBlock = db->loadUndoBlock(CDiskBlockPos(0, 8));
+        BOOST_CHECK_EQUAL(newBlock.size(), 6);
+        CBlockUndo block2 = newBlock.createOldBlock();
+        BOOST_CHECK_EQUAL(block2.vtxundo.size(), 1);
+        BOOST_CHECK_EQUAL(block2.vtxundo[0].vprevout.size(), 1);
+        BOOST_CHECK_EQUAL(block2.vtxundo[0].vprevout[0].nVersion, 3);
     }
 }
 

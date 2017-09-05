@@ -188,7 +188,8 @@ BITCOIN_CORE_H = \
   zmq/zmqnotificationinterface.h \
   zmq/zmqpublishnotifier.h \
   blockchain/Transaction.h \
-  blockchain/Block.h
+  blockchain/Block.h \
+  blockchain/UndoBlock.h
 
 
 obj/build.h: FORCE
@@ -315,6 +316,7 @@ libbitcoin_common_a_SOURCES = \
   script/standard.cpp \
   blockchain/Transaction.cpp \
   blockchain/Block.cpp \
+  blockchain/UndoBlock.cpp \
   $(BITCOIN_CORE_H)
 
 # util: shared between all executables.

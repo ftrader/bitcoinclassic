@@ -20,6 +20,8 @@
 #define BITCOIN_BLOCKCHAIN_BLOCK_P_H
 
 #include "chain.h"
+#include "BlocksDB.h"
+#include "streaming/ConstBuffer.h"
 
 #include <vector>
 #include <mutex>
@@ -39,6 +41,11 @@ struct DataFile {
     int filesize;
 };
 
+enum BlockType {
+    ForwardBlock,
+    RevertBlock
+};
+
 class DBPrivate {
 public:
     DBPrivate();
@@ -46,7 +53,10 @@ public:
 
     bool isReindexing;
 
-    std::shared_ptr<char> mapFile(int fileIndex, Blocks::DB::BlockType type, size_t *size_out = 0);
+    Streaming::ConstBuffer loadBlock(CDiskBlockPos pos, BlockType type);
+    Streaming::ConstBuffer writeBlock(int blockHeight, const Streaming::ConstBuffer &block, CDiskBlockPos &pos, BlockType type, uint32_t timestamp);
+
+    std::shared_ptr<char> mapFile(int fileIndex, BlockType type, size_t *size_out = 0);
 
     // Notify this class that the block file in question has been extended.  Calling this method
     // is required whenever block files get written-to and their size changes.  If this method

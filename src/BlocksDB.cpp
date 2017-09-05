@@ -447,29 +447,21 @@ boost::filesystem::path Blocks::getFilepathForIndex(int fileIndex, const char *p
     return path;
 }
 
-FastBlock Blocks::DB::loadBlock(CDiskBlockPos pos, BlockType type)
+FastBlock Blocks::DB::loadBlock(CDiskBlockPos pos)
 {
-    FastBlock block;
-    if (pos.nPos < 4)
-        throw std::runtime_error("Blocks::loadBlock got Database corruption");
-
-    size_t fileSize;
-    auto buf = d->mapFile(pos.nFile, type, &fileSize);
-    if (buf.get() == nullptr)
-        return block;
-    if (pos.nPos >= fileSize)
-        throw std::runtime_error("position outside of file");
-    uint32_t blockSize = le32toh(*((uint32_t*)(buf.get() + pos.nPos - 4)));
-    if (pos.nPos + blockSize > fileSize)
-        throw std::runtime_error("block sized bigger than file");
-    return FastBlock(Streaming::ConstBuffer(buf, buf.get() + pos.nPos, buf.get() + pos.nPos + blockSize));
+    return FastBlock(d->loadBlock(pos, ForwardBlock));
 }
 
-Streaming::ConstBuffer Blocks::DB::loadBlockFile(int fileIndex, BlockType type)
+FastUndoBlock Blocks::DB::loadUndoBlock(CDiskBlockPos pos)
+{
+    return FastUndoBlock(d->loadBlock(pos, RevertBlock));
+}
+
+Streaming::ConstBuffer Blocks::DB::loadBlockFile(int fileIndex)
 {
     try {
         size_t fileSize;
-        auto buf = d->mapFile(fileIndex, type, &fileSize);
+        auto buf = d->mapFile(fileIndex, ForwardBlock, &fileSize);
         if (buf.get() == nullptr)
             return Streaming::ConstBuffer(); // got pruned
         return Streaming::ConstBuffer(buf, buf.get(), buf.get() + fileSize - 1);
@@ -478,58 +470,20 @@ Streaming::ConstBuffer Blocks::DB::loadBlockFile(int fileIndex, BlockType type)
     }
 }
 
-FastBlock Blocks::DB::writeBlock(int blockHeight, const FastBlock &block, BlockType type)
+FastBlock Blocks::DB::writeBlock(int blockHeight, const FastBlock &block, CDiskBlockPos &pos)
 {
     assert(block.isFullBlock());
-    const int blockSize = block.size();
-    assert(blockSize < (int) MAX_BLOCKFILE_SIZE - 8);
-    LOCK(cs_LastBlockFile);
-    if ((int) vinfoBlockFile.size() <= nLastBlockFile)
-        vinfoBlockFile.resize(nLastBlockFile + 1);
-    if (vinfoBlockFile[nLastBlockFile].nSize + blockSize + 8 > MAX_BLOCKFILE_SIZE) {
-        // create a new file.
-        const bool useBlk = type == Blocks::DB::ForwardBlock;
-        const auto path = getFilepathForIndex(nLastBlockFile + 1, useBlk ? "blk" : "rev");
-        logDebug(Log::DB) << "Starting new file" << path.string();
-        size_t newFileSize = std::max(blockSize, (int) (useBlk ? BLOCKFILE_CHUNK_SIZE : UNDOFILE_CHUNK_SIZE));
-#ifdef WIN32
-        // due to the fact that on Windows we can't re-map, we skip the growing steps.
-        newFileSize = MAX_BLOCKFILE_SIZE;
-#endif
-        boost::filesystem::ofstream file(path);
-        file.close();
-        boost::filesystem::resize_file(path, newFileSize);
+    return FastBlock(d->writeBlock(blockHeight, block.data(), pos, ForwardBlock, block.timestamp()));
+}
 
-        vinfoBlockFile.resize(++nLastBlockFile + 1);
-    }
-    CBlockFileInfo &info = vinfoBlockFile[nLastBlockFile];
-
-    size_t fileSize;
-    auto buf = d->mapFile(nLastBlockFile, type, &fileSize);
-    if (buf.get() == nullptr)
-        throw std::runtime_error("Failed to open file");
-#ifndef WIN32
-    if (vinfoBlockFile[nLastBlockFile].nSize + blockSize + 8 > fileSize) {
-        const bool useBlk = type == Blocks::DB::ForwardBlock;
-        const auto path = getFilepathForIndex(nLastBlockFile, useBlk ? "blk" : "rev");
-        logDebug(Log::DB) << "File" << path.string() << "needs to be resized";
-        const size_t newFileSize = fileSize + (useBlk ? BLOCKFILE_CHUNK_SIZE : UNDOFILE_CHUNK_SIZE);
-        boost::filesystem::resize_file(path, newFileSize);
-        d->fileHasGrown(nLastBlockFile);
-        buf = d->mapFile(nLastBlockFile, type, &fileSize);
-    }
-#endif
-    char *data = buf.get() + info.nSize;
-    memcpy(data, Params().MessageStart(), 4);
-    data += 4;
-    uint32_t networkSize = htole32(blockSize);
-    memcpy(data, &networkSize, 4);
-    data += 4;
-    memcpy(data, block.data().begin(), blockSize);
-    info.AddBlock(blockHeight, block.timestamp());
-    info.nSize += blockSize + 8;
-    setDirtyFileInfo.insert(nLastBlockFile);
-    return FastBlock(Streaming::ConstBuffer(buf, data, data + blockSize));
+FastUndoBlock Blocks::DB::writeUndoBlock(const FastUndoBlock &block, int fileIndex, uint32_t *posInFile)
+{
+    assert(block.size() > 0);
+    CDiskBlockPos pos(fileIndex, 0);
+    FastUndoBlock answer(d->writeBlock(0, block.data(), pos, RevertBlock, 0));
+    if (posInFile)
+        *posInFile = pos.nPos;
+    return answer;
 }
 
 bool Blocks::DB::appendHeader(CBlockIndex *block)
@@ -643,9 +597,86 @@ Blocks::DBPrivate::~DBPrivate()
     }
 }
 
-std::shared_ptr<char> Blocks::DBPrivate::mapFile(int fileIndex, Blocks::DB::BlockType type, size_t *size_out)
+Streaming::ConstBuffer Blocks::DBPrivate::loadBlock(CDiskBlockPos pos, BlockType type)
 {
-    const bool useBlk = type == Blocks::DB::ForwardBlock;
+    if (pos.nPos < 4)
+        throw std::runtime_error("Blocks::loadBlock got Database corruption");
+    size_t fileSize;
+    auto buf = mapFile(pos.nFile, type, &fileSize);
+    if (buf.get() == nullptr)
+        throw std::runtime_error("Failed to memmap block");
+    if (pos.nPos >= fileSize)
+        throw std::runtime_error("position outside of file");
+    uint32_t blockSize = le32toh(*((uint32_t*)(buf.get() + pos.nPos - 4)));
+    if (pos.nPos + blockSize > fileSize)
+        throw std::runtime_error("block sized bigger than file");
+    return Streaming::ConstBuffer(buf, buf.get() + pos.nPos, buf.get() + pos.nPos + blockSize);
+}
+
+Streaming::ConstBuffer Blocks::DBPrivate::writeBlock(int blockHeight, const Streaming::ConstBuffer &block, CDiskBlockPos &pos, BlockType type, uint32_t timestamp)
+{
+    const int blockSize = block.size();
+    assert(blockSize < (int) MAX_BLOCKFILE_SIZE - 8);
+    LOCK(cs_LastBlockFile);
+
+    bool newFile = false;
+    const bool useBlk = type == ForwardBlock;
+    if ((int) vinfoBlockFile.size() <= nLastBlockFile) { // first file.
+        newFile = true;
+        vinfoBlockFile.resize(nLastBlockFile + 1);
+    } else if (useBlk && vinfoBlockFile[nLastBlockFile].nSize + blockSize + 8 > MAX_BLOCKFILE_SIZE) {
+        // previous file full.
+        newFile = true;
+        vinfoBlockFile.resize(++nLastBlockFile + 1);
+    }
+    if (useBlk) // revert files get to tell us which file they want to be in
+        pos.nFile = nLastBlockFile;
+    CBlockFileInfo &info = vinfoBlockFile[pos.nFile];
+    if (newFile || (!useBlk && info.nUndoSize == 0)) {
+        const auto path = getFilepathForIndex(pos.nFile, useBlk ? "blk" : "rev");
+        logDebug(Log::DB) << "Starting new file" << path.string();
+        size_t newFileSize = std::max(blockSize, (int) (useBlk ? BLOCKFILE_CHUNK_SIZE : UNDOFILE_CHUNK_SIZE));
+#ifdef WIN32
+        // due to the fact that on Windows we can't re-map, we skip the growing steps.
+        newFileSize = MAX_BLOCKFILE_SIZE;
+#endif
+        boost::filesystem::ofstream file(path);
+        file.close();
+        boost::filesystem::resize_file(path, newFileSize);
+    }
+    size_t fileSize;
+    auto buf = mapFile(pos.nFile, type, &fileSize);
+    if (buf.get() == nullptr)
+        throw std::runtime_error("Failed to open file");
+    uint32_t *posInFile = useBlk ? &info.nSize : &info.nUndoSize;
+#ifndef WIN32
+    if (*posInFile + blockSize + 8 > fileSize) {
+        const auto path = getFilepathForIndex(pos.nFile, useBlk ? "blk" : "rev");
+        logDebug(Log::DB) << "File" << path.string() << "needs to be resized";
+        const size_t newFileSize = fileSize + (useBlk ? BLOCKFILE_CHUNK_SIZE : UNDOFILE_CHUNK_SIZE);
+        boost::filesystem::resize_file(path, newFileSize);
+        fileHasGrown(pos.nFile);
+        buf = mapFile(pos.nFile, type, &fileSize);
+    }
+#endif
+    pos.nPos = *posInFile + 8;
+    char *data = buf.get() + *posInFile;
+    memcpy(data, Params().MessageStart(), 4);
+    data += 4;
+    uint32_t networkSize = htole32(blockSize);
+    memcpy(data, &networkSize, 4);
+    data += 4;
+    memcpy(data, block.begin(), blockSize);
+    if (type == ForwardBlock)
+        info.AddBlock(blockHeight, timestamp);
+    *posInFile += blockSize + 8;
+    setDirtyFileInfo.insert(pos.nFile);
+    return Streaming::ConstBuffer(buf, data, data + blockSize);
+}
+
+std::shared_ptr<char> Blocks::DBPrivate::mapFile(int fileIndex, Blocks::BlockType type, size_t *size_out)
+{
+    const bool useBlk = type == ForwardBlock;
     std::vector<DataFile*> &list = useBlk ? datafiles : revertDatafiles;
     const char *prefix = useBlk ? "blk" : "rev";
 
@@ -683,8 +714,7 @@ std::shared_ptr<char> Blocks::DBPrivate::mapFile(int fileIndex, Blocks::DB::Bloc
             df->buffer = std::weak_ptr<char>(buf);
             df->filesize = df->file.size();
         } else {
-            logCritical(Log::DB) << "Blocks::loadBlock: failed to memmap data-file"
-                    << path.string();
+            logCritical(Log::DB) << "Blocks::DB: failed to memmap data-file" << path.string();
         }
     }
     if (size_out) *size_out = df->filesize;

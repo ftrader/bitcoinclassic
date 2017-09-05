@@ -23,6 +23,7 @@
 
 #include "dbwrapper.h"
 
+#include <blockchain/UndoBlock.h>
 #include <boost/unordered_map.hpp>
 #include <streaming/ConstBuffer.h>
 #include <string>
@@ -94,14 +95,11 @@ public:
     bool isReindexing() const;
     bool setIsReindexing(bool fReindex);
 
-    enum BlockType {
-        ForwardBlock,
-        RevertBlock
-    };
-
-    FastBlock loadBlock(CDiskBlockPos pos, BlockType type = ForwardBlock);
-    Streaming::ConstBuffer loadBlockFile(int fileIndex, BlockType type = ForwardBlock);
-    FastBlock writeBlock(int blockHeight, const FastBlock &block, BlockType type = ForwardBlock);
+    FastBlock loadBlock(CDiskBlockPos pos);
+    FastUndoBlock loadUndoBlock(CDiskBlockPos pos);
+    Streaming::ConstBuffer loadBlockFile(int fileIndex);
+    FastBlock writeBlock(int blockHeight, const FastBlock &block, CDiskBlockPos &pos);
+    FastUndoBlock writeUndoBlock(const FastUndoBlock &block, int fileIndex, uint32_t *posInFile = 0);
 
     /**
      * @brief make the blocks-DB aware of a new header-only tip.
