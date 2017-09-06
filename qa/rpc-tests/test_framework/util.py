@@ -116,6 +116,7 @@ bitcoind_processes = {}
 
 def initialize_datadir(dirname, n):
     datadir = os.path.join(dirname, "node"+str(n))
+    print "init %s" % datadir
     if not os.path.isdir(datadir):
         os.makedirs(datadir)
     with open(os.path.join(datadir, "bitcoin.conf"), 'w') as f:
@@ -127,7 +128,7 @@ def initialize_datadir(dirname, n):
         f.write("listenonion=0\n")
 
     with open(os.path.join(datadir, "logs.conf"), 'w') as f:
-        f.write("channel file\noption timestamp time millisecond\n0 debug\n1000 debug\n2000 debug\n3000 debug\n4000 debug\n5000 debug\n6000 debug\n7000 debug\n8000 debug\n")
+        f.write("channel file\noption timestamp time millisecond\n0 debug\n1000 debug\n2000 debug\n3000 quiet\n3001 info\n4000 debug\n5000 debug\n6000 debug\n7000 debug\n8000 debug\n")
     return datadir
 
 def initialize_chain(test_dir):
@@ -238,8 +239,7 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
     datadir = os.path.join(dirname, "node"+str(i))
     if binary is None:
         binary = os.getenv("BITCOIND", "bitcoind")
-    # RPC tests still depend on free transactions
-    args = [ binary, "-datadir="+datadir, "-server", "-keypool=1", "-discover=0", "-rest", "-blockprioritysize=50000" ]
+    args = [ binary, "-datadir="+datadir, "-server", "-keypool=1", "-discover=0", "-rest" ]
     if extra_args is not None: args.extend(extra_args)
     bitcoind_processes[i] = subprocess.Popen(args)
     devnull = open(os.devnull, "w")

@@ -24,7 +24,7 @@ class ReindexTest(BitcoinTestFramework):
         self.nodes[0].wallet.generate(3)
         stop_node(self.nodes[0], 0)
         wait_bitcoinds()
-        self.nodes[0]=start_node(0, self.options.tmpdir, ["-debug", "-reindex", "-checkblockindex=1"])
+        self.nodes[0]=start_node(0, self.options.tmpdir, ["-reindex", "-checkblockindex=1"])
         assert_equal(self.nodes[0].getblockcount(), 3)
         print "Success"
 

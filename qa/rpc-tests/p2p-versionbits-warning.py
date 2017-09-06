@@ -69,7 +69,7 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         # Open and close to create zero-length file
         with open(self.alert_filename, 'w') as f:
             pass
-        self.node_options = ["-debug", "-alertnotify=echo %s >> \"" + self.alert_filename + "\""]
+        self.node_options = ["-alertnotify=echo %s >> \"" + self.alert_filename + "\""]
         self.nodes.append(start_node(0, self.options.tmpdir, self.node_options))
 
         import re
@@ -143,7 +143,7 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         # Empty out the alert file
         with open(self.alert_filename, 'w') as f:
             pass
-        self.nodes[0] = start_node(0, self.options.tmpdir, ["-debug", "-alertnotify=echo %s >> \"" + self.alert_filename + "\""])
+        self.nodes[0] = start_node(0, self.options.tmpdir, ["-alertnotify=echo %s >> \"" + self.alert_filename + "\""])
 
         # Connecting one block should be enough to generate an error.
         self.nodes[0].wallet.generate(1)
@@ -153,7 +153,7 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         self.test_versionbits_in_alert_file()
 
         # Test framework expects the node to still be running...
-        self.nodes[0] = start_node(0, self.options.tmpdir, ["-debug", "-alertnotify=echo %s >> \"" + self.alert_filename + "\""])
+        self.nodes[0] = start_node(0, self.options.tmpdir, ["-alertnotify=echo %s >> \"" + self.alert_filename + "\""])
 
 
 if __name__ == '__main__':

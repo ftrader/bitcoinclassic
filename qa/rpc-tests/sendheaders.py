@@ -214,7 +214,7 @@ class SendHeadersTest(BitcoinTestFramework):
 
     def setup_network(self):
         self.nodes = []
-        self.nodes = start_nodes(2, self.options.tmpdir, [["-debug", "-use-thinblocks=0"]]*2)
+        self.nodes = start_nodes(2, self.options.tmpdir, [["-use-thinblocks=0"]]*2)
         connect_nodes(self.nodes[0], 1)
 
     # mine count blocks and return the new tip
