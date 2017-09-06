@@ -22,7 +22,6 @@
 
 #include "addrman.h"
 #include "Application.h"
-#include "arith_uint256.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "checkqueue.h"
@@ -32,36 +31,19 @@
 #include "hash.h"
 #include "init.h"
 #include "merkleblock.h"
-#include "net.h"
 #include "policy/policy.h"
-#include "pow.h"
-#include "primitives/block.h"
-#include "primitives/transaction.h"
-#include "script/script.h"
 #include "script/sigcache.h"
-#include "script/standard.h"
 #include "thinblock.h"
-#include "tinyformat.h"
-#include "BlocksDB.h"
-#include "txdb.h"
 #include "txmempool.h"
 #include "txorphancache.h"
 #include "ui_interface.h"
 #include "undo.h"
-#include "util.h"
 #include "utilmoneystr.h"
-#include "utilstrencodings.h"
 #include "validationinterface.h"
-#include "versionbits.h"
 
-#include <sstream>
-#include <algorithm>
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/atomic.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
 #include <boost/math/distributions/poisson.hpp>
-#include <boost/thread.hpp>
 
 /**
  * Global state
