@@ -28,14 +28,14 @@ BOOST_FIXTURE_TEST_SUITE(Connections, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(BigMessage)
 {
     auto localhost = boost::asio::ip::address_v4::loopback();
-    const int PORT = 12551;
+    const int port = std::max(1100, rand() % 65000);
 
     std::list<NetworkConnection> stash;
     int messageSize = -1;
 
     MockApplication::doInit();
     NetworkManager server(Application::instance()->ioService());
-    server.bind(boost::asio::ip::tcp::endpoint(localhost, PORT), [&stash, &messageSize](NetworkConnection &connection) {
+    server.bind(boost::asio::ip::tcp::endpoint(localhost, port), [&stash, &messageSize](NetworkConnection &connection) {
         connection.setOnIncomingMessage([&messageSize](const Message &message) {
             messageSize = message.body().size();
         });
@@ -45,7 +45,7 @@ BOOST_AUTO_TEST_CASE(BigMessage)
 
     NetworkManager client(Application::instance()->ioService());
     EndPoint ep;
-    ep.announcePort = PORT;
+    ep.announcePort = port;
     ep.ipAddress = localhost;
     auto con = client.connection(ep);
     con.connect();
