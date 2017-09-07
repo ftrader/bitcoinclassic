@@ -378,10 +378,10 @@ enum {
 inline Log::SilentItem operator<<(Log::SilentItem item, const CInv&) { return item; }
 inline Log::Item operator<<(Log::Item item, const CInv &inv) {
     const bool old = item.useSpace();
-    item.space() << inv.GetCommand() << inv.getHash();
+    item.nospace() << inv.GetCommand() << '{' << inv.getHash() << '}';
     if (old)
-        return item.maybespace();
-    return item.nospace();
+        return item.space();
+    return item;
 }
 
 
