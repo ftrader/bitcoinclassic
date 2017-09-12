@@ -404,7 +404,7 @@ static FILE* OpenDiskFile(const CDiskBlockPos &pos, const char *prefix, bool fRe
 {
     if (pos.IsNull())
         return NULL;
-    boost::filesystem::path path = Blocks::getFilepathForIndex(pos.nFile, prefix);
+    boost::filesystem::path path = Blocks::getFilepathForIndex(pos.nFile, prefix, true);
     boost::filesystem::create_directories(path.parent_path());
     FILE* file = fopen(path.string().c_str(), "rb+");
     if (!file && !fReadOnly)
@@ -714,7 +714,7 @@ std::shared_ptr<char> Blocks::DBPrivate::mapFile(int fileIndex, Blocks::BlockTyp
     }
     std::shared_ptr<char> buf = df->buffer.lock();
     if (buf.get() == nullptr) {
-        auto path = getFilepathForIndex(fileIndex, prefix);
+        auto path = getFilepathForIndex(fileIndex, prefix, true);
         auto mode = std::ios_base::binary | std::ios_base::in;
         if (fileIndex == nLastBlockFile) // limit writable bit only to the last file.
             mode |= std::ios_base::out;
