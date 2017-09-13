@@ -1,8 +1,22 @@
-// Copyright (c) 2010 Satoshi Nakamoto
-// Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (C) 2016-2017 Tom Zander <tomz@freedommail.ch>
-// Distributed under the MIT software license, see the accompanying
-// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+/*
+ * This file is part of the bitcoin-classic project
+ * Copyright (c) 2010 Satoshi Nakamoto
+ * Copyright (c) 2009-2015 The Bitcoin Core developers
+ * Copyright (C) 2016-2017 Tom Zander <tomz@freedommail.ch>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "chainparams.h"
 #include "consensus/merkle.h"
@@ -141,8 +155,8 @@ public:
         assert(consensus.hashGenesisBlock == uint256S("0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"));
         assert(genesis.hashMerkleRoot == uint256S("0x4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b"));
 
-        const bool uahfEnabled = GetArg("-uahfstarttime", UAHF_CLIENT) > 0;
-        if (uahfEnabled) {
+        const bool fallback = GetArg("-uahfstarttime", UAHF_CLIENT) > 0;
+        if (GetBoolArg("-uahf", fallback)) {
             vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "seed.bitcoinabc.org"));
             vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "seed-abc.bitcoinforks.org"));
             vSeeds.push_back(CDNSSeedData("bitprim.org", "seed.bitprim.org"));
@@ -194,7 +208,6 @@ public:
         };
     }
 };
-static CMainParams mainParams;
 
 /**
  * Testnet (v3)
@@ -259,8 +272,8 @@ public:
 
         vFixedSeeds.clear();
         vSeeds.clear();
-        const bool uahfEnabled = GetArg("-uahfstarttime", UAHF_CLIENT) > 0;
-        if (uahfEnabled) {
+        const bool fallback = GetArg("-uahfstarttime", UAHF_CLIENT) > 0;
+        if (GetBoolArg("-uahf", fallback)) {
             // nodes with support for servicebits filtering should be at the top
             vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "testnet-seed.bitcoinabc.org"));
             vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "testnet-seed-abc.bitcoinforks.org"));
@@ -302,7 +315,6 @@ public:
 
     }
 };
-static CTestNetParams testNetParams;
 
 /**
  * Testnet (FlexTrans)
@@ -328,7 +340,6 @@ public:
         checkpointData = CCheckpointData();
     }
 };
-static CFTTestNetParams *fttestNetParams = nullptr;
 
 /**
  * Regression test
@@ -407,28 +418,61 @@ public:
         base58Prefixes[EXT_SECRET_KEY] = boost::assign::list_of(0x04)(0x35)(0x83)(0x94).convert_to_container<std::vector<unsigned char> >();
     }
 };
-static CRegTestParams regTestParams;
 
-static CChainParams *pCurrentParams = 0;
+namespace Static {
+class Chains {
+public:
+    Chains() : m_currentParams(nullptr) {}
+    CChainParams &main() {
+        if (m_main.get() == nullptr)
+            m_main.reset(new CMainParams());
+        return *m_main.get();
+    }
+    CChainParams &regtest() {
+        if (m_regtest.get() == nullptr)
+            m_regtest.reset(new CRegTestParams());
+        return *m_regtest.get();
+    }
+    CChainParams &testnet3() {
+        if (m_testnet.get() == nullptr)
+            m_testnet.reset(new CTestNetParams());
+        return *m_testnet.get();
+    }
+    CChainParams &flextransTestnet() {
+        if (m_testnetFT.get() == nullptr)
+            m_testnetFT.reset(new CFTTestNetParams());
+        return *m_testnetFT.get();
+    }
+    CChainParams &current() const {
+        assert(m_currentParams);
+        return *m_currentParams;
+    }
+    void setCurrent(CChainParams &params) {
+        m_currentParams = &params;
+    }
+
+private:
+    std::unique_ptr<CChainParams> m_main, m_testnet, m_regtest, m_testnetFT;
+    CChainParams *m_currentParams;
+};
+}
+
+Static::Chains s_chains;
 
 const CChainParams &Params() {
-    assert(pCurrentParams);
-    return *pCurrentParams;
+    return s_chains.current();
 }
 
 CChainParams& Params(const std::string& chain)
 {
     if (chain == CBaseChainParams::MAIN)
-        return mainParams;
+        return s_chains.main();
     else if (chain == CBaseChainParams::TESTNET)
-        return testNetParams;
+        return s_chains.testnet3();
     else if (chain == CBaseChainParams::REGTEST)
-        return regTestParams;
-    else if (chain == CBaseChainParams::FLEXTRANSTESTNET) {
-        if (fttestNetParams == nullptr)
-            fttestNetParams = new CFTTestNetParams(); // yes, this leaks on exit, but as we are not a library thats ok.
-        return *fttestNetParams;
-    }
+        return s_chains.regtest();
+    else if (chain == CBaseChainParams::FLEXTRANSTESTNET)
+        return  s_chains.flextransTestnet();
     else
         throw std::runtime_error(strprintf("%s: Unknown chain %s.", __func__, chain));
 }
@@ -439,7 +483,7 @@ void SelectParams(const std::string& network)
     if (network == CBaseChainParams::FLEXTRANSTESTNET) {
         flexTransActive = true;
     }
-    pCurrentParams = &Params(network);
+    s_chains.setCurrent(Params(network));
 }
 
 const CMessageHeader::MessageStartChars &CChainParams::magic() const
