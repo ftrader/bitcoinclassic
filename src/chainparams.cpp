@@ -275,7 +275,6 @@ public:
         const bool fallback = GetArg("-uahfstarttime", UAHF_CLIENT) > 0;
         if (GetBoolArg("-uahf", fallback)) {
             // nodes with support for servicebits filtering should be at the top
-            vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "testnet-seed.bitcoinabc.org"));
             vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "testnet-seed-abc.bitcoinforks.org"));
             vSeeds.push_back(CDNSSeedData("bitprim.org", "testnet-seed.bitprim.org"));
         } else {
