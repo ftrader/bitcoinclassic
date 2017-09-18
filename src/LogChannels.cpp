@@ -25,10 +25,11 @@ std::string shortenMethod(const char *methodName) {
     assert(methodName);
     const char *start = strchr(methodName, ' ');
     const char *end = strchr(methodName, '(');
-    if (!start || start > end)
-        start = methodName;
-    if (start && end) {
-        ++start;
+    if (end) {
+        if (!start || start > end)
+            start = methodName;
+        else
+            ++start;
         ++end;
         std::string copy(start, end - start);
         return std::move(copy);
