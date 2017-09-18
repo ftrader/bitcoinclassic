@@ -5421,6 +5421,12 @@ bool ProcessMessages(CNode* pfrom)
 
         // Scan for message start
         if (pfrom->nVersion == 0) { // uninitialized.
+            if (!pfrom->fInbound // we already set isCashNode bool to right value.
+                    && memcmp(msg.hdr.pchMessageStart, pfrom->magic(), MESSAGE_START_SIZE) != 0) {
+                fOk = false;
+                break;
+            }
+
             if (memcmp(msg.hdr.pchMessageStart, chainparams.MessageStart(), MESSAGE_START_SIZE) != 0) {
                 if (memcmp(msg.hdr.pchMessageStart, chainparams.CashMessageStart(), MESSAGE_START_SIZE) != 0) {
                     logWarning(Log::Net) << "ProcessMessage: handshake invalid messageStart"
@@ -5438,20 +5444,15 @@ bool ProcessMessages(CNode* pfrom)
                     break;
                 }
             }
-        }
-        else {
-            if (memcmp(msg.hdr.pchMessageStart, pfrom->magic(), MESSAGE_START_SIZE) != 0) {
-                logWarning(Log::Net) << "PROCESSMESSAGE: INVALID MESSAGESTART" << SanitizeString(msg.hdr.GetCommand()) << "peer:" << pfrom->id;
-                fOk = false;
-                break;
-            }
+            assert (memcmp(msg.hdr.pchMessageStart, pfrom->magic(), MESSAGE_START_SIZE) == 0);
         }
 
         // Read header
         CMessageHeader& hdr = msg.hdr;
-        if (!hdr.IsValid(pfrom->magic()))
-        {
-            LogPrintf("PROCESSMESSAGE: ERRORS IN HEADER %s peer=%d\n", SanitizeString(hdr.GetCommand()), pfrom->id);
+        if (!hdr.IsValid(pfrom->magic())) {
+            logWarning(Log::Net) << "PROCESSMESSAGE: ERRORS IN HEADER" << SanitizeString(msg.hdr.GetCommand()) << "peer:" << pfrom->id;
+            LOCK(cs_main);
+            Misbehaving(pfrom->id, 5);
             continue;
         }
         std::string strCommand = hdr.GetCommand();
