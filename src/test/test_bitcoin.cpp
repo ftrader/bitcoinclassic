@@ -62,8 +62,13 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
 #endif
         ClearDatadirCache();
         pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i", (unsigned long)GetTime(), (int)(GetRand(100000)));
-        boost::filesystem::create_directories(pathTemp / "regtest/blocks/index");
-        boost::filesystem::create_directories(pathTemp / "blocks/index");
+        try {
+            boost::filesystem::create_directories(pathTemp / "regtest/blocks/index");
+            boost::filesystem::create_directories(pathTemp / "blocks/index");
+        } catch (const std::exception &e) {
+            // most likely not an issue. Just log it.
+            logDebug() << e;
+        }
         mapArgs["-datadir"] = pathTemp.string();
         Blocks::DB::createTestInstance(1<<20);
         pcoinsdbview = new CCoinsViewDB(1 << 23, true);
