@@ -406,7 +406,7 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest)
 
         // Add node
         CNode* pnode = new CNode(hSocket, addrConnect, pszDest ? pszDest : "", false);
-        if (GetBoolArg("-initiatecashconnections", false) && Application::uahfChainState() >= Application::UAHFRulesActive)
+        if (GetBoolArg("-initiatecashconnections", true) && Application::uahfChainState() >= Application::UAHFRulesActive)
             pnode->isCashNode = true;
         pnode->PushVersion();
 
