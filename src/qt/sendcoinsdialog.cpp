@@ -752,11 +752,13 @@ void SendCoinsDialog::coinControlChangeEdited(const QString& text)
 {
     if (model && model->getAddressTableModel())
     {
+        QString addressText(GUIUtil::convertCashBitcoinAddress(text));
+
         // Default to no change address until verified
         CoinControlDialog::coinControl->destChange = CNoDestination();
         ui->labelCoinControlChangeLabel->setStyleSheet("QLabel{color:red;}");
 
-        CBitcoinAddress addr = CBitcoinAddress(text.toStdString());
+        CBitcoinAddress addr = CBitcoinAddress(addressText.toStdString());
 
         if (text.isEmpty()) // Nothing entered
         {
@@ -779,7 +781,7 @@ void SendCoinsDialog::coinControlChangeEdited(const QString& text)
                 ui->labelCoinControlChangeLabel->setStyleSheet("QLabel{color:black;}");
 
                 // Query label
-                QString associatedLabel = model->getAddressTableModel()->labelForAddress(text);
+                QString associatedLabel = model->getAddressTableModel()->labelForAddress(addressText);
                 if (!associatedLabel.isEmpty())
                     ui->labelCoinControlChangeLabel->setText(associatedLabel);
                 else

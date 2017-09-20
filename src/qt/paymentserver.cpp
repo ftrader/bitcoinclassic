@@ -408,20 +408,8 @@ void PaymentServer::handleURIOrFile(const QString& s)
             SendCoinsRecipient recipient;
             if (GUIUtil::parseBitcoinURI(s, &recipient))
             {
-                CBitcoinAddress address(recipient.address.toStdString());
-                bool valid = address.IsValid();
-                if (!valid && Application::uahfChainState() != Application::UAHFDisabled) {
-                    valid = address.IsValid(CBitcoinAddress::BCCVersions);
-                    if (valid) { // convert from Cash format to normal format.
-                        CKeyID key;
-                        bool ok = address.GetKeyID(key, CBitcoinAddress::BCCVersions);
-                        assert(ok);
-                        address = CBitcoinAddress(key);
-                        assert(address.IsValid());
-                        recipient.address = QString::fromStdString(address.ToString());
-                    }
-                }
-                if (!valid) {
+                CBitcoinAddress address(GUIUtil::convertCashBitcoinAddress(recipient.address).toStdString());
+                if (!address.IsValid()) {
                     Q_EMIT message(tr("URI handling"), tr("Invalid payment address %1").arg(recipient.address),
                         CClientUIInterface::MSG_ERROR);
                 }
