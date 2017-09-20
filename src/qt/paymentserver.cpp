@@ -203,8 +203,7 @@ void PaymentServer::LoadRootCAs(X509_STORE* _store)
 //
 void PaymentServer::ipcParseCommandLine(int argc, char* argv[])
 {
-    for (int i = 1; i < argc; i++)
-    {
+    for (int i = 1; i < argc; i++) {
         QString arg(argv[i]);
         if (arg.startsWith("-"))
             continue;
@@ -213,44 +212,12 @@ void PaymentServer::ipcParseCommandLine(int argc, char* argv[])
         // network as that would require fetching and parsing the payment request.
         // That means clicking such an URI which contains a testnet payment request
         // will start a mainnet instance and throw a "wrong network" error.
-        if (arg.startsWith(GUIUtil::uriPrefix(), Qt::CaseInsensitive)) // bitcoin: URI
-        {
+        if (arg.startsWith(GUIUtil::uriPrefix(), Qt::CaseInsensitive)) { // bitcoincash: URI
             savedPaymentRequests.append(arg);
-
-            SendCoinsRecipient r;
-            if (GUIUtil::parseBitcoinURI(arg, &r) && !r.address.isEmpty())
-            {
-                CBitcoinAddress address(r.address.toStdString());
-
-                if (address.IsValid(Params(CBaseChainParams::MAIN)))
-                {
-                    SelectParams(CBaseChainParams::MAIN);
-                }
-                else if (address.IsValid(Params(CBaseChainParams::TESTNET)))
-                {
-                    SelectParams(CBaseChainParams::TESTNET);
-                }
-            }
         }
-        else if (QFile::exists(arg)) // Filename
-        {
+        else if (QFile::exists(arg)) { // Filename
             savedPaymentRequests.append(arg);
-
-            PaymentRequestPlus request;
-            if (readPaymentRequestFromFile(arg, request))
-            {
-                if (request.getDetails().network() == "main")
-                {
-                    SelectParams(CBaseChainParams::MAIN);
-                }
-                else if (request.getDetails().network() == "test")
-                {
-                    SelectParams(CBaseChainParams::TESTNET);
-                }
-            }
-        }
-        else
-        {
+        } else {
             // Printing to debug.log is about the best we can do here, the
             // GUI hasn't started yet so we can't pop up a message box.
             qWarning() << "PaymentServer::ipcSendCommandLine: Payment request file does not exist: " << arg;
@@ -442,7 +409,19 @@ void PaymentServer::handleURIOrFile(const QString& s)
             if (GUIUtil::parseBitcoinURI(s, &recipient))
             {
                 CBitcoinAddress address(recipient.address.toStdString());
-                if (!address.IsValid()) {
+                bool valid = address.IsValid();
+                if (!valid && Application::uahfChainState() != Application::UAHFDisabled) {
+                    valid = address.IsValid(CBitcoinAddress::BCCVersions);
+                    if (valid) { // convert from Cash format to normal format.
+                        CKeyID key;
+                        bool ok = address.GetKeyID(key, CBitcoinAddress::BCCVersions);
+                        assert(ok);
+                        address = CBitcoinAddress(key);
+                        assert(address.IsValid());
+                        recipient.address = QString::fromStdString(address.ToString());
+                    }
+                }
+                if (!valid) {
                     Q_EMIT message(tr("URI handling"), tr("Invalid payment address %1").arg(recipient.address),
                         CClientUIInterface::MSG_ERROR);
                 }

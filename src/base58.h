@@ -103,8 +103,11 @@ public:
     bool Set(const CKeyID &id);
     bool Set(const CScriptID &id);
     bool Set(const CTxDestination &dest);
-    bool IsValid() const;
-    bool IsValid(const CChainParams &params) const;
+    enum BitcoinCashEnabled {
+        BCCVersions,
+        LegacyVersions
+    };
+    bool IsValid(BitcoinCashEnabled bcc = LegacyVersions) const;
 
     CBitcoinAddress() {}
     CBitcoinAddress(const CTxDestination &dest) { Set(dest); }
@@ -112,7 +115,7 @@ public:
     CBitcoinAddress(const char* pszAddress) { SetString(pszAddress); }
 
     CTxDestination Get() const;
-    bool GetKeyID(CKeyID &keyID) const;
+    bool GetKeyID(CKeyID &keyID, BitcoinCashEnabled bcc = LegacyVersions) const;
     bool IsScript() const;
 };
 
