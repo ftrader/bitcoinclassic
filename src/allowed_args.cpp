@@ -296,7 +296,7 @@ static void addConnectionOptions(AllowedArgs& allowedArgs)
         .addArg("whitelistrelay", optionalBool, strprintf(_("Accept relayed transactions received from whitelisted peers even when not relaying transactions (default: %d)"), DEFAULT_WHITELISTRELAY))
         .addArg("whitelistforcerelay", optionalBool, strprintf(_("Force relay of transactions from whitelisted peers even they violate local relay policy (default: %d)"), DEFAULT_WHITELISTFORCERELAY))
         .addArg("maxuploadtarget=<n>", requiredInt, strprintf(_("Tries to keep outbound traffic under the given target (in MiB per 24h), 0 = no limit (default: %d)"), DEFAULT_MAX_UPLOAD_TARGET))
-        .addArg("initiatecashconnections", optionalBool, "When using the BitcoinCash network, initiate connections only Cash nodes understand. (default: false)")
+        .addArg("initiatecashconnections", optionalBool, "When using the BitcoinCash network, initiate connections only Cash nodes understand. (default: true)")
         .addArg("flexiblehandshake", optionalBool, "Allow connections from the legacy network when using the BitcoinCash network, or vice-versa. (default: true)")
         ;
 }

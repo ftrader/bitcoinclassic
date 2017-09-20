@@ -235,16 +235,15 @@ bool CBitcoinAddress::Set(const CTxDestination& dest)
     return boost::apply_visitor(CBitcoinAddressVisitor(this), dest);
 }
 
-bool CBitcoinAddress::IsValid() const
-{
-    return IsValid(Params());
-}
-
-bool CBitcoinAddress::IsValid(const CChainParams& params) const
+bool CBitcoinAddress::IsValid(BitcoinCashEnabled bcc) const
 {
     bool fCorrectSize = vchData.size() == 20;
-    bool fKnownVersion = vchVersion == params.Base58Prefix(CChainParams::PUBKEY_ADDRESS) ||
-                         vchVersion == params.Base58Prefix(CChainParams::SCRIPT_ADDRESS);
+    bool fKnownVersion = vchVersion == Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS) ||
+                         vchVersion == Params().Base58Prefix(CChainParams::SCRIPT_ADDRESS);
+    if (!fKnownVersion && bcc == BCCVersions) {
+        fKnownVersion = vchVersion == Params().CashBase58Prefix(CChainParams::PUBKEY_ADDRESS)
+                     || vchVersion == Params().CashBase58Prefix(CChainParams::SCRIPT_ADDRESS);
+    }
     return fCorrectSize && fKnownVersion;
 }
 
@@ -262,9 +261,10 @@ CTxDestination CBitcoinAddress::Get() const
         return CNoDestination();
 }
 
-bool CBitcoinAddress::GetKeyID(CKeyID& keyID) const
+bool CBitcoinAddress::GetKeyID(CKeyID& keyID, BitcoinCashEnabled bcc) const
 {
-    if (!IsValid() || vchVersion != Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS))
+    if (!IsValid(bcc) || !(vchVersion == Params().Base58Prefix(CChainParams::PUBKEY_ADDRESS)
+                       || (bcc == BCCVersions && vchVersion == Params().CashBase58Prefix(CChainParams::PUBKEY_ADDRESS))))
         return false;
     uint160 id;
     memcpy(&id, &vchData[0], 20);

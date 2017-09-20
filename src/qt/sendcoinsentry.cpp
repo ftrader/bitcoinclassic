@@ -76,7 +76,7 @@ void SendCoinsEntry::on_addressBookButton_clicked()
 
 void SendCoinsEntry::on_payTo_textChanged(const QString &address)
 {
-    updateLabel(address);
+    updateLabel(GUIUtil::convertCashBitcoinAddress(address));
 }
 
 void SendCoinsEntry::setModel(WalletModel *model)
@@ -129,7 +129,7 @@ bool SendCoinsEntry::validate()
     if (recipient.paymentRequest.IsInitialized())
         return retval;
 
-    if (!model->validateAddress(ui->payTo->text()))
+    if (!model->validateAddress(GUIUtil::convertCashBitcoinAddress(ui->payTo->text())))
     {
         ui->payTo->setValid(false);
         retval = false;
@@ -148,7 +148,7 @@ bool SendCoinsEntry::validate()
     }
 
     // Reject dust outputs:
-    if (retval && GUIUtil::isDust(ui->payTo->text(), ui->payAmount->value())) {
+    if (retval && GUIUtil::isDust(GUIUtil::convertCashBitcoinAddress(ui->payTo->text()), ui->payAmount->value())) {
         ui->payAmount->setValid(false);
         retval = false;
     }
@@ -163,7 +163,7 @@ SendCoinsRecipient SendCoinsEntry::getValue()
         return recipient;
 
     // Normal payment
-    recipient.address = ui->payTo->text();
+    recipient.address = GUIUtil::convertCashBitcoinAddress(ui->payTo->text());
     recipient.label = ui->addAsLabel->text();
     recipient.amount = ui->payAmount->value();
     recipient.message = ui->messageTextLabel->text();
