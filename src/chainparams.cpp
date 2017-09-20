@@ -157,8 +157,7 @@ public:
 
         const bool fallback = GetArg("-uahfstarttime", UAHF_CLIENT) > 0;
         if (GetBoolArg("-uahf", fallback)) {
-            vSeeds.push_back(CDNSSeedData("bitcoinabc.org", "seed.bitcoinabc.org"));
-            vSeeds.push_back(CDNSSeedData("bitcoinforks.org", "seed-abc.bitcoinforks.org"));
+            vSeeds.push_back(CDNSSeedData("thomaszander.se", "cash-seed.bitcoin.thomaszander.se"));
             vSeeds.push_back(CDNSSeedData("bitprim.org", "seed.bitprim.org"));
         } else {
             vSeeds.push_back(CDNSSeedData("bitcoin.sipa.be", "seed.bitcoin.sipa.be")); // Pieter Wuille
