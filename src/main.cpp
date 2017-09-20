@@ -3589,6 +3589,7 @@ bool LoadBlockIndexDB()
                                  << "date:" << DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime())
                                  << "progress:" <<  Checkpoints::GuessVerificationProgress(chainparams.Checkpoints(), chainActive.Tip());
 
+    pindexBestHeader = chainActive.Tip();
     return true;
 }
 
