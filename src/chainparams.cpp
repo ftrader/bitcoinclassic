@@ -21,15 +21,10 @@
 #include "chainparams.h"
 #include "consensus/merkle.h"
 
-#include "tinyformat.h"
 #include "util.h"
 #include "utilstrencodings.h"
 
-#include <cassert>
-
 #include <boost/assign/list_of.hpp>
-#include <boost/atomic.hpp>
-#include <consensus/validation.h>
 
 #include "chainparamsseeds.h"
 
