@@ -25,5 +25,3 @@ override_dh_auto_configure:
 	     --sharedstatedir=/usr/share/bitcoin \
 	     --localstatedir=/var/lib/bitcoin
 
-override_dh_auto_test:
-	src/test/test_bitcoin --log_level=test_suite
