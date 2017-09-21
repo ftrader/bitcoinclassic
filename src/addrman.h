@@ -376,7 +376,7 @@ public:
             CAddrInfo &info = mapInfo[n];
             s >> info;
             mapAddr[info] = n;
-            info.nRandomPos = vRandom.size();
+            info.nRandomPos = static_cast<int>(vRandom.size());
             vRandom.push_back(n);
             if (nVersion != 1 || nUBuckets != ADDRMAN_NEW_BUCKET_COUNT) {
                 // In case the new table data cannot be used (nVersion unknown, or bucket count wrong),
@@ -399,7 +399,7 @@ public:
             int nKBucket = info.GetTriedBucket(nKey);
             int nKBucketPos = info.GetBucketPosition(nKey, false, nKBucket);
             if (vvTried[nKBucket][nKBucketPos] == -1) {
-                info.nRandomPos = vRandom.size();
+                info.nRandomPos = static_cast<int>(vRandom.size());
                 info.fInTried = true;
                 vRandom.push_back(nIdCount);
                 mapInfo[nIdCount] = info;
@@ -473,7 +473,7 @@ public:
 
     unsigned int GetSerializeSize(int nType, int nVersion) const
     {
-        return (CSizeComputer(nType, nVersion) << *this).size();
+        return static_cast<unsigned int>((CSizeComputer(nType, nVersion) << *this).size());
     }
 
     void Clear();
