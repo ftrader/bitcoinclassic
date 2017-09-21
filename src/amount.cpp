@@ -5,8 +5,6 @@
 
 #include "amount.h"
 
-#include "tinyformat.h"
-
 CFeeRate::CFeeRate(const CAmount& nFeePaid, size_t nSize)
 {
     if (nSize > 0)
