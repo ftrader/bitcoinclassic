@@ -3543,7 +3543,6 @@ bool LoadBlockIndexDB()
             CBlockIndex *forkBlock = chainActive[forkHeight];
             if (Params().uahfForkBlockId() == forkBlock->GetBlockHash()) {
                 Application::setUahfChainState(chainActive.Tip() == forkBlock ? Application::UAHFRulesActive: Application::UAHFActive);
-                ReconsiderBlock(forkBlock); // keep this in for a couple of releases only.
             } else {
                 logWarning(8002) << "The UAHF fork-block is not in the main chain";
                 needsRollback = true;
@@ -3578,6 +3577,12 @@ bool LoadBlockIndexDB()
             logInfo(8002) << "Waiting for fork block. UAHF rules active";
             pcoinsTip->Flush();
         }
+
+        // after too many people having had problems with valid blocks being marked invalid,
+        // lets reconsider them and all children of them.
+        it = Blocks::indexMap.find(Params().uahfForkBlockId());
+        if (it != Blocks::indexMap.end())
+            ReconsiderBlock(it->second);
     } else {
         assert(Application::uahfChainState() == Application::UAHFDisabled);
     }
