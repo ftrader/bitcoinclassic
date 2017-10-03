@@ -412,6 +412,7 @@ void BitcoinApplication::requestInitialize()
 void BitcoinApplication::requestShutdown()
 {
     qDebug() << __func__ << ": Requesting shutdown";
+    StartShutdown(); // shut down bitcoind processes (for instance reindex)
     startThread();
     window->hide();
     window->setClientModel(0);
