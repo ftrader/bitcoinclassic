@@ -4419,6 +4419,13 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
 
     else if (strCommand == NetMsgType::INV)
     {
+        if (Application::uahfChainState() == Application::UAHFWaiting) {
+            // this means we are not just in initial block download, we are in a state
+            // where filling the mempool or getting the latest block just doesn't make any sense.
+            // This avoids us banning CASH nodes before we follow the UAHF rules.
+            if (Params().uahfForkBlockHeight() > chainActive.Height())
+                return true;
+        }
         std::vector<CInv> vInv;
         vRecv >> vInv;
         if (vInv.size() > MAX_INV_SZ)
