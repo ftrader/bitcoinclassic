@@ -2152,8 +2152,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (Application::uahfChainState() == Application::UAHFWaiting && pindex->GetMedianTimePast() >= Application::uahfStartTime()) {
         Application::setUahfChainState(Application::UAHFRulesActive);
         // next block is the big, fork-block.
-        logWarning() << "ConnectBlock connected the last block in the old chain, UAHF rules from now on only. Emptying mempool";
-        mempool.clear();
+        logWarning() << "ConnectBlock connected the last block in the old chain, UAHF rules from now on only.";
     } else if (Application::uahfChainState() == Application::UAHFRulesActive && pindex->pprev->GetMedianTimePast() >= Application::uahfStartTime()) {
         logInfo(8002) << "UAHF block found that activates the chain" << block.GetHash();
         // enable UAHF (aka BCC) on first block after the calculated timestamp
