@@ -1,6 +1,6 @@
 /*
  * This file is part of the bitcoin-classic project
- * Copyright (C) 2016 Tom Zander <tomz@freedommail.ch>
+ * Copyright (C) 2016-2017 Tom Zander <tomz@freedommail.ch>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,6 +19,8 @@
 #include "AdminProtocol.h"
 
 #include "streaming/MessageBuilder.h"
+#include "BlocksDB.h"
+#include "main.h"
 #include "rpcserver.h"
 #include "base58.h"
 #include <univalue.h>
@@ -169,7 +171,52 @@ public:
 
 private:
     bool m_verbose;
+};
 
+class GetBlockHeader : public AdminRPCBinding::DirectParser
+{
+public:
+    GetBlockHeader() : DirectParser(Admin::BlockChain::GetBlockHeaderReply, 190) {}
+
+    void buildReply(Streaming::MessageBuilder &builder, CBlockIndex *index) {
+        assert(index);
+        builder.add(Admin::BlockChain::BlockHash, index->GetBlockHash());
+        builder.add(Admin::BlockChain::Confirmations, chainActive.Contains(index) ? chainActive.Height() - index->nHeight : -1);
+        builder.add(Admin::BlockChain::Height, index->nHeight);
+        builder.add(Admin::BlockChain::Version, index->nVersion);
+        builder.add(Admin::BlockChain::MerkleRoot, index->hashMerkleRoot);
+        builder.add(Admin::BlockChain::Time, (uint64_t) index->nTime);
+        builder.add(Admin::BlockChain::MedianTime, (uint64_t) index->GetMedianTimePast());
+        builder.add(Admin::BlockChain::Nonce, (uint64_t) index->nNonce);
+        builder.add(Admin::BlockChain::Bits, (uint64_t) index->nBits);
+        builder.add(Admin::BlockChain::Difficulty, GetDifficulty(index));
+        builder.add(Admin::BlockChain::PrevBlockHash, index->phashBlock);
+        auto next = chainActive.Next(index);
+        if (next)
+            builder.add(Admin::BlockChain::NextBlockHash, next->GetBlockHash());
+    }
+
+    void buildReply(const Message &request, Streaming::MessageBuilder &builder) {
+        Streaming::MessageParser parser(request.body());
+
+        Streaming::ParsedType type = parser.next();
+        while (type == Streaming::FoundTag) {
+            if (parser.tag() == Admin::BlockChain::BlockHash) {
+                uint256 hash = parser.uint256Data();
+                auto mi = Blocks::indexMap.find(hash);
+                if (mi != Blocks::indexMap.end())
+                    return buildReply(builder, mi->second);
+            }
+            if (parser.tag() == Admin::BlockChain::Height) {
+                int height = parser.intData();
+                auto index = chainActive[height];
+                if (index)
+                    return buildReply(builder, index);
+            }
+
+            type = parser.next();
+        }
+    }
 };
 
 // raw transactions
@@ -484,6 +531,8 @@ AdminRPCBinding::Parser *AdminRPCBinding::createParser(const Message &message)
             return new GetBestBlockHash();
         case Admin::BlockChain::GetBlock:
             return new GetBlock();
+        case Admin::BlockChain::GetBlockHeader:
+            return new GetBlockHeader();
         }
         break;
     case Admin::ControlService:
