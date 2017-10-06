@@ -217,35 +217,49 @@ void Admin::Server::Connection::incomingMessage(const Message &message)
     }
 
     assert(parser.get());
-    assert(!parser->method().empty());
 
-    try {
-        UniValue request(UniValue::VOBJ);
-        parser->createRequest(message, request);
-        UniValue result;
+    auto *rpcParser = dynamic_cast<AdminRPCBinding::RpcParser*>(parser.get());
+    if (rpcParser) {
+        assert(!rpcParser->method().empty());
         try {
-            result = tableRPC.execute(parser->method(), request);
-        } catch (UniValue& objError) {
-            sendFailedMessage(message, find_value(objError, "message").get_str());
-            return;
-        } catch(const std::exception &e) {
-            sendFailedMessage(message, std::string(e.what()));
-            return;
+            UniValue request(UniValue::VOBJ);
+            rpcParser->createRequest(message, request);
+            UniValue result;
+            try {
+                result = tableRPC.execute(rpcParser->method(), request);
+            } catch (UniValue& objError) {
+                sendFailedMessage(message, find_value(objError, "message").get_str());
+                return;
+            } catch(const std::exception &e) {
+                sendFailedMessage(message, std::string(e.what()));
+                return;
+            }
+            m_bufferPool.reserve(rpcParser->messageSize(result));
+            Streaming::MessageBuilder builder(m_bufferPool);
+            rpcParser->buildReply(builder, result);
+            Message reply = builder.message(message.serviceId(), rpcParser->replyMessageId());
+            const int requestId = message.headerInt(Admin::RequestId);
+            if (requestId != -1)
+                reply.setHeaderInt(Admin::RequestId, requestId);
+            m_connection.send(reply);
+        } catch (const std::exception &e) {
+            std::string error = "Interal Error " + std::string(e.what());
+            LogPrintf("AdminServer internal error in parsing %s: %s", rpcParser->method(), e.what());
+            (void) m_bufferPool.commit(); // make sure the partial message is discarded
+            sendFailedMessage(message, error);
         }
-        m_bufferPool.reserve(parser->messageSize(result));
+        return;
+    }
+    auto *directParser = dynamic_cast<AdminRPCBinding::DirectParser*>(parser.get());
+    if (directParser) {
+        m_bufferPool.reserve(directParser->calculateMessageSize());
         Streaming::MessageBuilder builder(m_bufferPool);
-        parser->buildReply(builder, result);
-        Message reply = builder.message(message.serviceId(), parser->replyMessageId());
+        directParser->buildReply(message, builder);
+        Message reply = builder.message(message.serviceId(), directParser->replyMessageId());
         const int requestId = message.headerInt(Admin::RequestId);
         if (requestId != -1)
             reply.setHeaderInt(Admin::RequestId, requestId);
         m_connection.send(reply);
-    } catch (const std::exception &e) {
-        std::string error = "Interal Error " + std::string(e.what());
-        LogPrintf("AdminServer internal error in parsing %s: %s", parser->method(), e.what());
-        (void) m_bufferPool.commit(); // make sure the partial message is discarded
-        sendFailedMessage(message, error);
-        return;
     }
 }
 

@@ -33,10 +33,10 @@ namespace {
 
 // blockchain
 
-class GetBlockChainInfo : public AdminRPCBinding::Parser
+class GetBlockChainInfo : public AdminRPCBinding::RpcParser
 {
 public:
-    GetBlockChainInfo() : Parser("getblockchaininfo", Admin::BlockChain::GetBlockChainInfoReply, 500) {}
+    GetBlockChainInfo() : RpcParser("getblockchaininfo", Admin::BlockChain::GetBlockChainInfoReply, 500) {}
     virtual void buildReply(Streaming::MessageBuilder &builder, const UniValue &result) {
         const UniValue &chain = find_value(result, "chain");
         builder.add(Admin::BlockChain::Chain, chain.get_str());
@@ -75,16 +75,16 @@ public:
     }
 };
 
-class GetBestBlockHash : public AdminRPCBinding::Parser
+class GetBestBlockHash : public AdminRPCBinding::RpcParser
 {
 public:
-    GetBestBlockHash() : Parser("getbestblockhash", Admin::BlockChain::GetBestBlockHashReply, 50) {}
+    GetBestBlockHash() : RpcParser("getbestblockhash", Admin::BlockChain::GetBestBlockHashReply, 50) {}
 };
 
-class GetBlock : public AdminRPCBinding::Parser
+class GetBlock : public AdminRPCBinding::RpcParser
 {
 public:
-    GetBlock() : Parser("getblock", Admin::BlockChain::GetBlockReply), m_verbose(false) {}
+    GetBlock() : RpcParser("getblock", Admin::BlockChain::GetBlockReply), m_verbose(false) {}
     virtual void createRequest(const Message &message, UniValue &output) {
         std::string txid;
         Streaming::MessageParser parser(message.body());
@@ -174,10 +174,10 @@ private:
 
 // raw transactions
 
-class GetRawTransaction : public AdminRPCBinding::Parser
+class GetRawTransaction : public AdminRPCBinding::RpcParser
 {
 public:
-    GetRawTransaction() : Parser("getrawtransaction", Admin::RawTransactions::GetRawTransactionReply) {}
+    GetRawTransaction() : RpcParser("getrawtransaction", Admin::RawTransactions::GetRawTransactionReply) {}
 
     virtual void createRequest(const Message &message, UniValue &output) {
         std::string txid;
@@ -195,10 +195,10 @@ public:
     }
 };
 
-class SendRawTransaction : public AdminRPCBinding::Parser
+class SendRawTransaction : public AdminRPCBinding::RpcParser
 {
 public:
-    SendRawTransaction() : Parser("sendrawtransaction", Admin::RawTransactions::SendRawTransactionReply, 10) {}
+    SendRawTransaction() : RpcParser("sendrawtransaction", Admin::RawTransactions::SendRawTransactionReply, 10) {}
 
     virtual void createRequest(const Message &message, UniValue &output) {
         std::string tx;
@@ -222,10 +222,10 @@ struct PrevTransaction {
     }
 };
 
-class SignRawTransaction : public AdminRPCBinding::Parser
+class SignRawTransaction : public AdminRPCBinding::RpcParser
 {
 public:
-    SignRawTransaction() : AdminRPCBinding::Parser("signrawtransaction", Admin::RawTransactions::SignRawTransactionReply) {}
+    SignRawTransaction() : AdminRPCBinding::RpcParser("signrawtransaction", Admin::RawTransactions::SignRawTransactionReply) {}
 
     virtual void createRequest(const Message &message, UniValue &output) {
         output = UniValue(UniValue::VARR);
@@ -343,10 +343,10 @@ public:
 
 // wallet
 
-class ListUnspent : public AdminRPCBinding::Parser
+class ListUnspent : public AdminRPCBinding::RpcParser
 {
 public:
-    ListUnspent() : Parser("listunspent", Admin::Wallet::ListUnspentReply) {}
+    ListUnspent() : RpcParser("listunspent", Admin::Wallet::ListUnspentReply) {}
 
     virtual int calculateMessageSize(const UniValue &result) const {
         return result.size() * 300;
@@ -416,10 +416,10 @@ public:
     }
 };
 
-class GetNewAddress : public AdminRPCBinding::Parser
+class GetNewAddress : public AdminRPCBinding::RpcParser
 {
 public:
-    GetNewAddress() : Parser("getnewaddress", Admin::Wallet::GetNewAddressReply, 50) {}
+    GetNewAddress() : RpcParser("getnewaddress", Admin::Wallet::GetNewAddressReply, 50) {}
     virtual void buildReply(Streaming::MessageBuilder &builder, const UniValue &result) {
         builder.add(Admin::Wallet::BitcoinAddress, result.get_str());
     }
@@ -427,10 +427,10 @@ public:
 
 // Util
 
-class CreateAddress : public AdminRPCBinding::Parser
+class CreateAddress : public AdminRPCBinding::RpcParser
 {
 public:
-    CreateAddress() : Parser("createaddress", Admin::Util::CreateAddressReply, 150) {}
+    CreateAddress() : RpcParser("createaddress", Admin::Util::CreateAddressReply, 150) {}
 
     virtual void buildReply(Streaming::MessageBuilder &builder, const UniValue &result) {
         const UniValue &address = find_value(result, "address");
@@ -445,9 +445,9 @@ public:
     }
 };
 
-class ValidateAddress : public AdminRPCBinding::Parser {
+class ValidateAddress : public AdminRPCBinding::RpcParser {
 public:
-    ValidateAddress() : Parser("validateaddress", Admin::Util::ValidateAddressReply, 300) {}
+    ValidateAddress() : RpcParser("validateaddress", Admin::Util::ValidateAddressReply, 300) {}
 
     virtual void buildReply(Streaming::MessageBuilder &builder, const UniValue &result) {
         const UniValue &isValid = find_value(result, "isvalid");
@@ -489,7 +489,7 @@ AdminRPCBinding::Parser *AdminRPCBinding::createParser(const Message &message)
     case Admin::ControlService:
         switch (message.messageId()) {
         case Admin::Control::Stop:
-            return new Parser("stop", Admin::Control::StopReply);
+            return new RpcParser("stop", Admin::Control::StopReply);
             break;
         }
         break;
@@ -524,25 +524,36 @@ AdminRPCBinding::Parser *AdminRPCBinding::createParser(const Message &message)
 }
 
 
-AdminRPCBinding::Parser::Parser(const std::string &method, int answerMessageId, int messageSize)
+AdminRPCBinding::Parser::Parser(ParserType type, int answerMessageId, int messageSize)
     : m_messageSize(messageSize),
       m_replyMessageId(answerMessageId),
+      m_type(type)
+{
+}
+
+AdminRPCBinding::RpcParser::RpcParser(const std::string &method, int replyMessageId, int messageSize)
+    : Parser(WrapsRPCCall, replyMessageId, messageSize),
       m_method(method)
 {
 }
 
-void AdminRPCBinding::Parser::buildReply(Streaming::MessageBuilder &builder, const UniValue &result)
+void AdminRPCBinding::RpcParser::buildReply(Streaming::MessageBuilder &builder, const UniValue &result)
 {
     std::vector<char> answer;
     boost::algorithm::unhex(result.get_str(), back_inserter(answer));
     builder.add(1, answer);
 }
 
-void AdminRPCBinding::Parser::createRequest(const Message &, UniValue &)
+void AdminRPCBinding::RpcParser::createRequest(const Message &, UniValue &)
 {
 }
 
-int AdminRPCBinding::Parser::calculateMessageSize(const UniValue &result) const
+int AdminRPCBinding::RpcParser::calculateMessageSize(const UniValue &result) const
 {
     return result.get_str().size() + 20;
+}
+
+AdminRPCBinding::DirectParser::DirectParser(int replyMessageId, int messageSize)
+    : Parser(IncludesHandler, replyMessageId, messageSize)
+{
 }

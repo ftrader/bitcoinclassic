@@ -31,13 +31,44 @@ class Message;
 namespace AdminRPCBinding
 {
     /**
-     * This is a baseclass for a specific command.
+     * This class, and its subclasses RpcParser / DirectParser are the baseclasses for specific commands.
+     *
      * In the admin API we have specific incoming messages which map to a Parser implementation.
      * When a new request comes in from the network, the specific parser that can handle this
-     * is instantiated and then createReqeust() is called with the message we received from the network,
-     * followed by a call to parser() which is meant to build the answer.
+     * is instantiated and then based on the admin server finding either a RpcParser or a DirectParser
+     * its virtual methods will be called.
      */
     class Parser {
+    public:
+        enum ParserType {
+            WrapsRPCCall,
+            IncludesHandler
+        };
+
+        Parser(ParserType type, int replyMessageId, int messageSize = -1);
+        virtual ~Parser() {}
+
+        inline ParserType type() const {
+            return m_type;
+        }
+
+        /// Returns the message-id we set in the answer message. Typically an enum from the AdminProtocol.h
+        inline int replyMessageId() const {
+            return m_replyMessageId;
+        }
+
+    protected:
+        int m_messageSize;
+        int m_replyMessageId;
+        ParserType m_type;
+    };
+
+    /**
+     * When a new request comes in from the network, the specific parser that can handle this
+     * is instantiated and then createReqeust() is called with the message we received from the network,
+     * followed by a call to buildReply() which is meant to build the answer.
+     */
+    class RpcParser : public Parser {
     public:
         /**
          * Constructor, meant for overloading. Subclasses should pass in the parameters.
@@ -45,8 +76,7 @@ namespace AdminRPCBinding
          * @param replyMessageId the enum value of the answer message that the network client expects.
          * @param messageSize when passed in, this will be the hardcoded size and calculateMessageSize() will not be called.
          */
-        Parser(const std::string &method, int replyMessageId, int messageSize = -1);
-        virtual ~Parser() {}
+        RpcParser(const std::string &method, int replyMessageId, int messageSize = -1);
 
         /**
          * @brief messageSize returns the amount of bytes we should reserve for the reply.
@@ -61,10 +91,6 @@ namespace AdminRPCBinding
         /// Returns the name of the RPC method we map
         inline const std::string &method() const {
             return m_method;
-        }
-        /// Returns the message-id we set in the answer message. Typically an enum from the AdminProtocol.h
-        int replyMessageId() const {
-            return m_replyMessageId;
         }
 
         /**
@@ -82,9 +108,26 @@ namespace AdminRPCBinding
         virtual int calculateMessageSize(const UniValue&) const;
 
     protected:
-        int m_messageSize;
-        int m_replyMessageId;
         std::string m_method;
+    };
+
+    /**
+     * When a new request comes in from the network, the specific parser that can handle this
+     * is instantiated and then buildReply() is called with the message we received from the network,
+     * expecting a reply to be created to be send back to the caller.
+     */
+    class DirectParser : public Parser {
+    public:
+        DirectParser(int replyMessageId, int messageSize = -1);
+
+        /// Return the size we shall reserve for the message to be created in buildReply.
+        /// This size CAN NOT be smaller than what is actually consumed in buildReply.
+        virtual int calculateMessageSize() const { return m_messageSize; }
+
+        /**
+         * @brief The buildReply method takes the request and builds the reply to be sent over the network.
+         */
+        virtual void buildReply(const Message &request, Streaming::MessageBuilder &builder) = 0;
     };
 
     /// maps an input message to a Parser implementation.
