@@ -1,6 +1,6 @@
 /*
  * This file is part of the bitcoin-classic project
- * Copyright (C) 2016 Tom Zander <tomz@freedommail.ch>
+ * Copyright (C) 2016-2017 Tom Zander <tomz@freedommail.ch>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -38,6 +38,33 @@ enum ParsedType {
 
 typedef boost::variant<int32_t, bool, uint64_t, std::string, std::vector<char>, double> variant;
 
+/**
+ * @brief The MessageParser class is a SOX-like parser of messages.
+ * This class allows a zero-copy way to iterate over a message and extract the fields when needed.
+ *
+ * A simple example usage can be;
+ *
+ * @code
+    MessageParser parser(message.body());
+    Streaming::ParsedType type = parser.next();
+    while (type == Streaming::FoundTag) {
+        if (parser.tag() == SomeEnumValue) {
+            logDebug() << parser.data();
+        }
+        else if (parser.tag() == SomeOtherEnumValue) {
+            if (!parser.isString())
+                logWarning() << "Bad argument for SomeOtherEnumValue, expected String!";
+            else
+                logDebug() << "->" << parser.stringData();
+        }
+        type = parser.next();
+    }
+    if (type == Streaming::Error) {
+        logWarning() << "Failed to parse the message";
+    }
+    @endcode
+ *
+ */
 class MessageParser
 {
 public:
@@ -113,6 +140,9 @@ private:
 
     ConstBuffer m_constBuffer; // we just have this here to make sure its refcounted
 };
-
 }
+
+inline Log::SilentItem operator<<(Log::SilentItem item, const Streaming::variant&) { return item; }
+Log::Item operator<<(Log::Item item, const Streaming::variant &data);
+
 #endif

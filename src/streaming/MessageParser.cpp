@@ -1,6 +1,6 @@
 /*
  * This file is part of the bitcoin-classic project
- * Copyright (C) 2016 Tom Zander <tomz@freedommail.ch>
+ * Copyright (C) 2016-2017 Tom Zander <tomz@freedommail.ch>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -329,4 +329,21 @@ int16_t Streaming::MessageParser::read16int(const char *buffer)
     answer = answer << 8;
     answer += buffer[0] & 0xFF;
     return answer;
+}
+
+Log::Item operator<<(Log::Item item, const Streaming::variant &data) {
+    const bool old = item.useSpace();
+    item.nospace() << "Streaming::variant[";
+    switch (data.which()) {
+    case 0: item << boost::get<int32_t>(data); break;
+    case 1: item << boost::get<bool>(data); break;
+    case 2: item << boost::get<uint64_t>(data); break;
+    case 3: item << boost::get<std::string>(data); break;
+    case 4: item << boost::get<std::vector<char> >(data); break;
+    case 5: item << boost::get<double>(data); break;
+    }
+    item << "]";
+    if (old)
+        return item.space();
+    return item;
 }
