@@ -22,6 +22,24 @@
 
 #include "hash.h"
 
+struct ValidateRAII {
+    CAddrMan *parent;
+    ValidateRAII(CAddrMan *parent) : parent(parent) {
+#ifdef DEBUG_ADDRMAN
+        int err = parent->validateInteral();
+        if (err != 0)
+            logCritical(Log::Addrman) << "ADDRMAN CONSISTENCY CHECK FAILED!!! err:" << err;
+#endif
+    }
+    ~ValidateRAII() {
+#ifdef DEBUG_ADDRMAN
+        int err = parent->validateInteral();
+        if (err != 0)
+            logCritical(Log::Addrman) << "ADDRMAN CONSISTENCY CHECK FAILED!!! err:" << err;
+#endif
+    }
+};
+
 bool CAddrInfo::getKnowsXThin() const
 {
     return fKnowsXThin;
@@ -127,7 +145,7 @@ double CAddrInfo::GetChance(int64_t nNow) const
 
 CAddrInfo *CAddrMan::Find(const CNetAddr &addr)
 {
-    LOCK(cs);
+    std::lock_guard<std::mutex> guard(lock);
     return Find_(addr);
 }
 
@@ -135,13 +153,13 @@ CAddrInfo* CAddrMan::Find_(const CNetAddr& addr, int* pnId)
 {
     std::map<CNetAddr, int>::iterator it = mapAddr.find(addr);
     if (it == mapAddr.end())
-        return NULL;
+        return nullptr;
     if (pnId)
         *pnId = (*it).second;
     std::map<int, CAddrInfo>::iterator it2 = mapInfo.find((*it).second);
     if (it2 != mapInfo.end())
         return &(*it2).second;
-    return NULL;
+    return nullptr;
 }
 
 CAddrInfo* CAddrMan::Create(const CAddress& addr, const CNetAddr& addrSource, int* pnId)
@@ -253,8 +271,10 @@ void CAddrMan::MarkTried(CAddrInfo& info, int nId)
     info.fInTried = true;
 }
 
-void CAddrMan::Good_(const CService& addr, int64_t nTime)
+void CAddrMan::Good(const CService& addr, int64_t nTime)
 {
+    std::lock_guard<std::mutex> guard(lock);
+    ValidateRAII raii(this);
     int nId;
     CAddrInfo* pinfo = Find_(addr, &nId);
 
@@ -370,8 +390,10 @@ bool CAddrMan::Add_(const CAddress& addr, const CNetAddr& source, int64_t nTimeP
     return fNew;
 }
 
-void CAddrMan::Attempt_(const CService& addr, int64_t nTime)
+void CAddrMan::Attempt(const CService& addr, int64_t nTime)
 {
+    std::lock_guard<std::mutex> guard(lock);
+    ValidateRAII raii(this);
     CAddrInfo* pinfo = Find_(addr);
 
     // if not found, bail out
@@ -389,8 +411,11 @@ void CAddrMan::Attempt_(const CService& addr, int64_t nTime)
     info.nAttempts++;
 }
 
-CAddrInfo CAddrMan::Select_(bool newOnly)
+CAddrInfo CAddrMan::Select(bool newOnly)
 {
+    std::lock_guard<std::mutex> guard(lock);
+    ValidateRAII raii(this);
+
     if (size() == 0)
         return CAddrInfo();
 
@@ -436,18 +461,18 @@ CAddrInfo CAddrMan::Select_(bool newOnly)
     }
 }
 
-#ifdef DEBUG_ADDRMAN
-int CAddrMan::Check_()
+int CAddrMan::validateInteral()
 {
+#ifdef DEBUG_ADDRMAN
     std::set<int> setTried;
     std::map<int, int> mapNew;
 
     if (vRandom.size() != nTried + nNew)
         return -7;
 
-    for (std::map<int, CAddrInfo>::iterator it = mapInfo.begin(); it != mapInfo.end(); it++) {
+    for (auto it = mapInfo.begin(); it != mapInfo.end(); it++) {
         int n = (*it).first;
-        CAddrInfo& info = (*it).second;
+        const CAddrInfo& info = (*it).second;
         if (info.fInTried) {
             if (!info.nLastSuccess)
                 return -1;
@@ -510,12 +535,16 @@ int CAddrMan::Check_()
     if (nKey.IsNull())
         return -16;
 
+#endif
     return 0;
 }
-#endif
 
-void CAddrMan::GetAddr_(std::vector<CAddress>& vAddr)
+std::vector<CAddress> CAddrMan::GetAddr()
 {
+    std::lock_guard<std::mutex> guard(lock);
+    ValidateRAII raii(this);
+    std::vector<CAddress> vAddr;
+
     unsigned int nNodes = static_cast<unsigned int>(ADDRMAN_GETADDR_MAX_PCT * vRandom.size() / 100);
     if (nNodes > ADDRMAN_GETADDR_MAX)
         nNodes = ADDRMAN_GETADDR_MAX;
@@ -533,10 +562,13 @@ void CAddrMan::GetAddr_(std::vector<CAddress>& vAddr)
         if (!ai.IsTerrible())
             vAddr.push_back(ai);
     }
+    return vAddr;
 }
 
-void CAddrMan::Connected_(const CService& addr, int64_t nTime)
+void CAddrMan::Connected(const CService& addr, int64_t nTime)
 {
+    std::lock_guard<std::mutex> guard(lock);
+    ValidateRAII raii(this);
     CAddrInfo* pinfo = Find_(addr);
 
     // if not found, bail out
@@ -587,87 +619,34 @@ CAddrMan::~CAddrMan()
 
 bool CAddrMan::Add(const CAddress &addr, const CNetAddr &source, int64_t nTimePenalty)
 {
-    bool fRet = false;
-    {
-        LOCK(cs);
-        Check();
-        fRet |= Add_(addr, source, nTimePenalty);
-        Check();
-    }
+    std::lock_guard<std::mutex> guard(lock);
+    ValidateRAII raii(this);
+    bool fRet = Add_(addr, source, nTimePenalty);
     if (fRet)
-        LogPrint("addrman", "Added %s from %s: %i tried, %i new\n", addr.ToStringIPPort(), source.ToString(), nTried, nNew);
+        logInfo(Log::Addrman) <<  "Added" << addr << "from" << source <<  "{" << nTried << "tried" << nNew << "new }";
+
     return fRet;
 }
 
 bool CAddrMan::Add(const std::vector<CAddress> &vAddr, const CNetAddr &source, int64_t nTimePenalty)
 {
+    std::lock_guard<std::mutex> guard(lock);
+    ValidateRAII raii(this);
     int nAdd = 0;
-    {
-        LOCK(cs);
-        Check();
-        for (std::vector<CAddress>::const_iterator it = vAddr.begin(); it != vAddr.end(); it++)
-            nAdd += Add_(*it, source, nTimePenalty) ? 1 : 0;
-        Check();
-    }
+    for (std::vector<CAddress>::const_iterator it = vAddr.begin(); it != vAddr.end(); it++)
+        nAdd += Add_(*it, source, nTimePenalty) ? 1 : 0;
+
     if (nAdd)
-        LogPrint("addrman", "Added %i addresses from %s: %i tried, %i new\n", nAdd, source.ToString(), nTried, nNew);
+        logInfo(Log::Addrman) <<  "Added" << nAdd << "addresses from" << source <<  "{" << nTried << "tried" << nNew << "new }";
     return nAdd > 0;
-}
-
-void CAddrMan::Good(const CService &addr, int64_t nTime)
-{
-    LOCK(cs);
-    Check();
-    Good_(addr, nTime);
-    Check();
-}
-
-void CAddrMan::Attempt(const CService &addr, int64_t nTime)
-{
-    LOCK(cs);
-    Check();
-    Attempt_(addr, nTime);
-    Check();
 }
 
 void CAddrMan::increaseUselessness(const CNetAddr &addr, int count)
 {
-    LOCK(cs);
+    std::lock_guard<std::mutex> guard(lock);
     auto info = Find_(addr);
     if (info)
         info->setUselessness(info->getUselessness() + count);
-}
-
-CAddrInfo CAddrMan::Select(bool newOnly)
-{
-    CAddrInfo addrRet;
-    {
-        LOCK(cs);
-        Check();
-        addrRet = Select_(newOnly);
-        Check();
-    }
-    return addrRet;
-}
-
-std::vector<CAddress> CAddrMan::GetAddr()
-{
-    Check();
-    std::vector<CAddress> vAddr;
-    {
-        LOCK(cs);
-        GetAddr_(vAddr);
-    }
-    Check();
-    return vAddr;
-}
-
-void CAddrMan::Connected(const CService &addr, int64_t nTime)
-{
-    LOCK(cs);
-    Check();
-    Connected_(addr, nTime);
-    Check();
 }
 
 void CAddrMan::MakeDeterministic()

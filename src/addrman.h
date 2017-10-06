@@ -29,6 +29,7 @@
 #include "util.h"
 
 #include <set>
+#include <mutex>
 
 /**
  * Extended statistics about a CAddress
@@ -195,8 +196,7 @@ public:
 class CAddrMan
 {
 private:
-    //! critical section to protect the inner data structures
-    mutable CCriticalSection cs;
+    mutable std::mutex lock;
 
     //! last used nId
     int nIdCount;
@@ -246,28 +246,8 @@ protected:
     //! Clear a position in a "new" table. This is the only place where entries are actually deleted.
     void ClearNew(int nUBucket, int nUBucketPos);
 
-    //! Mark an entry "good", possibly moving it from "new" to "tried".
-    void Good_(const CService &addr, int64_t nTime);
-
     //! Add an entry to the "new" table.
     bool Add_(const CAddress &addr, const CNetAddr& source, int64_t nTimePenalty);
-
-    //! Mark an entry as attempted to connect.
-    void Attempt_(const CService &addr, int64_t nTime);
-
-    //! Select an address to connect to, if newOnly is set to true, only the new table is selected from.
-    CAddrInfo Select_(bool newOnly);
-
-#ifdef DEBUG_ADDRMAN
-    //! Perform consistency check. Returns an error code or zero.
-    int Check_();
-#endif
-
-    //! Select several addresses at once.
-    void GetAddr_(std::vector<CAddress> &vAddr);
-
-    //! Mark an entry as currently-connected-to.
-    void Connected_(const CService &addr, int64_t nTime);
 
 public:
     /**
@@ -302,7 +282,7 @@ public:
     template<typename Stream>
     void Serialize(Stream &s, int nType, int nVersionDummy) const
     {
-        LOCK(cs);
+        std::lock_guard<std::mutex> guard(lock);
 
         unsigned char nVersion = 3;
         s << nVersion;
@@ -352,7 +332,7 @@ public:
     template<typename Stream>
     void Unserialize(Stream& s, int nType, int nVersionDummy)
     {
-        LOCK(cs);
+        std::lock_guard<std::mutex> guard(lock);
 
         Clear();
 
@@ -442,7 +422,7 @@ public:
             LogPrint("addrman", "addrman lost %i new and %i tried addresses due to collisions\n", nLostUnk, nLost);
         }
 
-        Check();
+        validateInteral();
     }
 
     unsigned int GetSerializeSize(int nType, int nVersion) const
@@ -456,22 +436,13 @@ public:
 
     ~CAddrMan();
 
+    //! \internal Consistency check
+    int validateInteral();
+
     //! Return the number of (unique) addresses in all tables.
     inline size_t size() const
     {
         return vRandom.size();
-    }
-
-    //! Consistency check
-    inline void Check() {
-#ifdef DEBUG_ADDRMAN
-        {
-            LOCK(cs);
-            int err;
-            if ((err=Check_()))
-                LogPrintf("ADDRMAN CONSISTENCY CHECK FAILED!!! err=%i\n", err);
-        }
-#endif
     }
 
     //! Add a single address.
@@ -480,15 +451,13 @@ public:
     //! Add multiple addresses.
     bool Add(const std::vector<CAddress> &vAddr, const CNetAddr& source, int64_t nTimePenalty = 0);
 
-    //! Mark an entry as accessible.
+    //! Mark an entry "good", possibly moving it from "new" to "tried".
     void Good(const CService &addr, int64_t nTime = GetAdjustedTime());
 
-    //! Mark an entry as connection attempted to.
+    //! Mark an entry as attempted to connect.
     void Attempt(const CService &addr, int64_t nTime = GetAdjustedTime());
 
-    /**
-     * Choose an address to connect to.
-     */
+    //! Select an address to connect to, if newOnly is set to true, only the new table is selected from.
     CAddrInfo Select(bool newOnly = false);
 
     //! Return a bunch of addresses, selected at random.
