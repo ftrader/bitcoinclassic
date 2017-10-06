@@ -32,14 +32,19 @@ void CAddrInfo::setKnowsXThin(bool value)
     fKnowsXThin = value;
 }
 
-bool CAddrInfo::getKnowsCash() const
+int CAddrInfo::getUselessness() const
 {
-    return fKnowsCash;
+    return uselessness;
 }
 
-void CAddrInfo::setKnowsCash(bool value)
+void CAddrInfo::setUselessness(int value)
 {
-    fKnowsCash = value;
+    uselessness = std::max(0, value);
+}
+
+int64_t CAddrInfo::getLastSuccess() const
+{
+    return nLastSuccess;
 }
 
 void CAddrInfo::Init()
@@ -50,7 +55,7 @@ void CAddrInfo::Init()
     nRefCount = 0;
     fInTried = false;
     fKnowsXThin = false;
-    fKnowsCash = false;
+    uselessness = 0;
     nRandomPos = -1;
 }
 
@@ -111,8 +116,10 @@ double CAddrInfo::GetChance(int64_t nNow) const
     // deprioritize 66% after each failed attempt, but at most 1/28th to avoid the search taking forever or overly penalizing outages.
     fChance *= pow(0.66, std::min(nAttempts, 8));
 
-    if (fKnowsXThin | fKnowsCash)
-        fChance *= 1.5;
+    if (uselessness > 0)
+        fChance /= uselessness * 10;
+    else if (fKnowsXThin)
+        fChance *= 2;
 
     return fChance;
 }
@@ -621,6 +628,14 @@ void CAddrMan::Attempt(const CService &addr, int64_t nTime)
     Check();
     Attempt_(addr, nTime);
     Check();
+}
+
+void CAddrMan::increaseUselessness(const CNetAddr &addr, int count)
+{
+    LOCK(cs);
+    auto info = Find_(addr);
+    if (info)
+        info->setUselessness(info->getUselessness() + count);
 }
 
 CAddrInfo CAddrMan::Select(bool newOnly)

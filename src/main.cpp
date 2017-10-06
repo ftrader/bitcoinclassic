@@ -1347,6 +1347,7 @@ void Misbehaving(NodeId nodeId, int howmuch)
         logCritical(Log::Net) << "Id:" << nodeId << state->nMisbehavior-howmuch << "=>" <<  state->nMisbehavior
                     << "Ban threshold exceeded";
         state->fShouldBan = true;
+        addrman.increaseUselessness(state->address, 2);
     } else {
         logWarning(Log::Net) << "Misbehaving" << "Id:" << nodeId << state->nMisbehavior-howmuch << "=>" << state->nMisbehavior;
     }
@@ -2134,8 +2135,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (Application::uahfChainState() == Application::UAHFWaiting && pindex->GetMedianTimePast() >= Application::uahfStartTime()) {
         Application::setUahfChainState(Application::UAHFRulesActive);
         // next block is the big, fork-block.
-        logWarning() << "ConnectBlock connected the last block in the old chain, UAHF rules from now on only. Emptying mempool";
-        mempool.clear();
+        logWarning() << "ConnectBlock connected the last block in the old chain, UAHF rules from now on only.";
     } else if (Application::uahfChainState() == Application::UAHFRulesActive && pindex->pprev->GetMedianTimePast() >= Application::uahfStartTime()) {
         logInfo(8002) << "UAHF block found that activates the chain" << block.GetHash();
         // enable UAHF (aka BCC) on first block after the calculated timestamp
@@ -3525,7 +3525,6 @@ bool LoadBlockIndexDB()
             CBlockIndex *forkBlock = chainActive[forkHeight];
             if (Params().uahfForkBlockId() == forkBlock->GetBlockHash()) {
                 Application::setUahfChainState(chainActive.Tip() == forkBlock ? Application::UAHFRulesActive: Application::UAHFActive);
-                ReconsiderBlock(forkBlock); // keep this in for a couple of releases only.
             } else {
                 logWarning(8002) << "The UAHF fork-block is not in the main chain";
                 needsRollback = true;
@@ -3560,6 +3559,12 @@ bool LoadBlockIndexDB()
             logInfo(8002) << "Waiting for fork block. UAHF rules active";
             pcoinsTip->Flush();
         }
+
+        // after too many people having had problems with valid blocks being marked invalid,
+        // lets reconsider them and all children of them.
+        it = Blocks::indexMap.find(Params().uahfForkBlockId());
+        if (it != Blocks::indexMap.end())
+            ReconsiderBlock(it->second);
     } else {
         assert(Application::uahfChainState() == Application::UAHFDisabled);
     }
@@ -4193,6 +4198,7 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
             pfrom->PushMessage(NetMsgType::REJECT, strCommand, REJECT_OBSOLETE,
                                strprintf("Version must be %d or greater", MIN_PEER_PROTO_VERSION));
             pfrom->fDisconnect = true;
+            addrman.increaseUselessness(pfrom->addr, 2);
             return false;
         }
 
@@ -4396,6 +4402,13 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
 
     else if (strCommand == NetMsgType::INV)
     {
+        if (Application::uahfChainState() == Application::UAHFWaiting) {
+            // this means we are not just in initial block download, we are in a state
+            // where filling the mempool or getting the latest block just doesn't make any sense.
+            // This avoids us banning CASH nodes before we follow the UAHF rules.
+            if (Params().uahfForkBlockHeight() > chainActive.Height())
+                return true;
+        }
         std::vector<CInv> vInv;
         vRecv >> vInv;
         if (vInv.size() > MAX_INV_SZ)
@@ -5406,6 +5419,7 @@ bool ProcessMessages(CNode* pfrom)
         if (pfrom->nVersion == 0) { // uninitialized.
             if (!pfrom->fInbound // we already set isCashNode bool to right value.
                     && memcmp(msg.hdr.pchMessageStart, pfrom->magic(), MESSAGE_START_SIZE) != 0) {
+                addrman.increaseUselessness(pfrom->addr);
                 fOk = false;
                 break;
             }
@@ -5414,6 +5428,7 @@ bool ProcessMessages(CNode* pfrom)
                 if (memcmp(msg.hdr.pchMessageStart, chainparams.CashMessageStart(), MESSAGE_START_SIZE) != 0) {
                     logWarning(Log::Net) << "ProcessMessage: handshake invalid messageStart"
                                          << SanitizeString(msg.hdr.GetCommand()) << "peer:" << pfrom->id;
+                    addrman.increaseUselessness(pfrom->addr);
                     fOk = false;
                     break;
                 }
@@ -5423,11 +5438,13 @@ bool ProcessMessages(CNode* pfrom)
             if (GetBoolArg("-flexiblehandshake", true) == false) {
                 // ignore clients that are not using our our net magic headers.
                 if (pfrom->isCashNode != (Application::uahfChainState() != Application::UAHFDisabled)) {
+                    addrman.increaseUselessness(pfrom->addr);
                     fOk = false;
                     break;
                 }
             }
             assert (memcmp(msg.hdr.pchMessageStart, pfrom->magic(), MESSAGE_START_SIZE) == 0);
+            addrman.increaseUselessness(pfrom->addr, -1);
         }
 
         // Read header
