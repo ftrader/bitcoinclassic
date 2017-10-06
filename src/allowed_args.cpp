@@ -260,12 +260,12 @@ static void addConnectionOptions(AllowedArgs& allowedArgs)
         .addArg("bantime=<n>", requiredInt, strprintf(_("Number of seconds to keep misbehaving peers from reconnecting (default: %u)"), DEFAULT_MISBEHAVING_BANTIME))
         .addArg("bind=<addr>", requiredStr, _("Bind to given address and always listen on it. Use [host]:port notation for IPv6"))
         .addArg("connect=<ip>", optionalStr, _("Connect only to the specified node(s)"))
-        .addArg("discover", optionalBool, _("Discover own IP addresses (default: 1 when listening and no -externalip or -proxy)"))
+        .addArg("discover", optionalBool, _("Discover own IP addresses (default: true when listening and no -externalip or -proxy)"))
         .addArg("dns", optionalBool, _("Allow DNS lookups for -addnode, -seednode and -connect") + " " + strprintf(_("(default: %u)"), DEFAULT_NAME_LOOKUP))
-        .addArg("dnsseed", optionalBool, _("Query for peer addresses via DNS lookup, if low on addresses (default: 1 unless -connect)"))
+        .addArg("dnsseed", optionalBool, _("Query for peer addresses via DNS lookup, if low on addresses (default: true unless -connect)"))
         .addArg("externalip=<ip>", requiredStr, _("Specify your own public address"))
         .addArg("forcednsseed", optionalBool, strprintf(_("Always query for peer addresses via DNS lookup (default: %u)"), DEFAULT_FORCEDNSSEED))
-        .addArg("listen", optionalBool, _("Accept connections from outside (default: 1 if no -proxy or -connect)"))
+        .addArg("listen", optionalBool, _("Accept connections from outside (default: true if no -proxy or -connect)"))
         .addArg("listenonion", optionalBool, strprintf(_("Automatically create Tor hidden service (default: %d)"), DEFAULT_LISTEN_ONION))
         .addArg("maxconnections=<n>", optionalInt, strprintf(_("Maintain at most <n> connections to peers (default: %u)"), DEFAULT_MAX_PEER_CONNECTIONS))
         .addArg("min-thin-peers=<n>", requiredInt, strprintf(_("Maintain at minimum <n> connections to thin-capable peers (default: %d)"), DEFAULT_MIN_THIN_PEERS))
@@ -285,9 +285,9 @@ static void addConnectionOptions(AllowedArgs& allowedArgs)
         .addArg("torpassword=<pass>", requiredStr, _("Tor control port password (default: empty)"))
 #ifdef USE_UPNP
 #if USE_UPNP
-        .addArg("upnp", optionalBool, _("Use UPnP to map the listening port (default: 1 when listening and no -proxy)"))
+        .addArg("upnp", optionalBool, _("Use UPnP to map the listening port (default: true when listening and no -proxy)"))
 #else
-        .addArg("upnp", optionalBool, _("Use UPnP to map the listening port (default: 0)"))
+        .addArg("upnp", optionalBool, _("Use UPnP to map the listening port (default: false)"))
 #endif
 #endif
         .addArg("whitebind=<addr>", requiredStr, _("Bind to given address and whitelist peers connecting to it. Use [host]:port notation for IPv6"))
@@ -389,7 +389,7 @@ static void addDebuggingOptions(AllowedArgs& allowedArgs, HelpMessageMode mode)
 #ifdef ENABLE_WALLET
         .addDebugArg("privdb", optionalBool, strprintf("Sets the DB_PRIVATE flag in the wallet db environment (default: %u)", DEFAULT_WALLET_PRIVDB))
 #endif
-        .addArg("shrinkdebugfile", optionalBool, _("Shrink debug.log file on client startup (default: 1 when no -debug)"))
+        .addArg("shrinkdebugfile", optionalBool, _("Shrink debug.log file on client startup (default: true when no -debug)"))
         ;
 }
 
@@ -408,7 +408,7 @@ static void addNodeRelayOptions(AllowedArgs& allowedArgs)
         .addArg("maxexpeditedtxrecipients=<n>", requiredInt, _("The maximum number of nodes this node will forward expedited transactions to"))
         .addArg("minrelaytxfee=<amt>", requiredAmount, strprintf(_("Fees (in %s/kB) smaller than this are considered zero fee for relaying, mining and transaction creation (default: %s)"),
             CURRENCY_UNIT, FormatMoney(DEFAULT_MIN_RELAY_TX_FEE)))
-        .addArg("use-thinblocks", optionalBool, _("Enable thin blocks to speed up the relay of blocks (default: 1)"))
+        .addArg("use-thinblocks", optionalBool, _("Enable thin blocks to speed up the relay of blocks (default: true)"))
         ;
 }
 
@@ -446,7 +446,7 @@ static void addAdminServerOptions(AllowedArgs& allowedArgs)
 {
     allowedArgs
         .addHeader("Admin server options: (Experimental!)")
-        .addArg("adminserver", optionalBool, "Accept connections on the admin-server (default 0)")
+        .addArg("adminserver", optionalBool, "Accept connections on the admin-server (default false)")
         .addArg("admincookiefile=<loc>", requiredStr, "Location of the adminserver auth cookie (default: data dir)")
         .addArg("adminlisten=<addr>", requiredStr, strprintf("Bind to given address to listen for admin server connections. Use [host]:port notation for IPv6. This option can be specified multiple times (default 127.0.0.1:%s and [::1]:%s)", BaseParams(CBaseChainParams::MAIN).AdminServerPort(), BaseParams(CBaseChainParams::MAIN).AdminServerPort()));
         ;
