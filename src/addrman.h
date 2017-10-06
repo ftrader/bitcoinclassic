@@ -59,10 +59,10 @@ private:
 
     //! in tried set? (memory only)
     bool fInTried;
-    //! remote node knew xthin last time we connected (memory only)
+    //! remote node knew xthin last time we connected
     bool fKnowsXThin;
 
-    bool fKnowsCash; //< remote node is a 'bitcoin-cash' capable node (memory only)
+    int uselessness; //< Higher scrores means we should try to avoid connecting to it. Goes up for banned nodes.
 
     friend class CAddrMan;
 
@@ -76,6 +76,10 @@ public:
         READWRITE(source);
         READWRITE(nLastSuccess);
         READWRITE(nAttempts);
+        if (nVersion >= 3) {
+            READWRITE(fKnowsXThin);
+            READWRITE(uselessness);
+        }
     }
 
     void Init();
@@ -117,8 +121,10 @@ public:
 
     bool getKnowsXThin() const;
     void setKnowsXThin(bool value);
-    bool getKnowsCash() const;
-    void setKnowsCash(bool value);
+    int getUselessness() const;
+    void setUselessness(int value);
+
+    int64_t getLastSuccess() const;
 };
 
 /** Stochastic address manager
@@ -183,8 +189,8 @@ public:
 //! the maximum number of nodes to return in a getaddr call
 #define ADDRMAN_GETADDR_MAX 2500
 
-/** 
- * Stochastical (IP) address manager 
+/**
+ * Stochastical (IP) address manager
  */
 class CAddrMan
 {
@@ -298,7 +304,7 @@ public:
     {
         LOCK(cs);
 
-        unsigned char nVersion = 2;
+        unsigned char nVersion = 3;
         s << nVersion;
         s << ((unsigned char)32);
         s << nKey;
@@ -319,14 +325,11 @@ public:
             }
         }
         nIds = 0;
-        std::set<int> preferredNodes;
         for (std::map<int, CAddrInfo>::const_iterator it = mapInfo.begin(); it != mapInfo.end(); ++it) {
             const CAddrInfo &info = (*it).second;
             if (info.fInTried) {
                 assert(nIds != nTried); // this means nTried was wrong, oh ow
                 s << info;
-                if (info.getKnowsXThin() || info.getKnowsCash())
-                    preferredNodes.insert(nIds);
                 nIds++;
             }
         }
@@ -343,12 +346,6 @@ public:
                     s << nIndex;
                 }
             }
-        }
-
-        // Save the index in 'new' nodes which had the flag to indicate it is xthin capable
-        s << (int) preferredNodes.size();
-        for (int id : preferredNodes) {
-            s << id;
         }
     }
 
@@ -374,12 +371,12 @@ public:
         // Deserialize entries from the new table.
         for (int n = 0; n < nNew; n++) {
             CAddrInfo &info = mapInfo[n];
-            s >> info;
+            info.Unserialize(s, nType, nVersion);
             mapAddr[info] = n;
             info.nRandomPos = vRandom.size();
             vRandom.push_back(n);
-            if (nVersion != 1 || nUBuckets != ADDRMAN_NEW_BUCKET_COUNT) {
-                // In case the new table data cannot be used (nVersion unknown, or bucket count wrong),
+            if (nUBuckets != ADDRMAN_NEW_BUCKET_COUNT) {
+                // In case the new table data cannot be used (bucket count wrong),
                 // immediately try to give them a reference based on their primary source address.
                 int nUBucket = info.GetNewBucket(nKey);
                 int nUBucketPos = info.GetBucketPosition(nKey, true, nUBucket);
@@ -395,7 +392,7 @@ public:
         int nLost = 0;
         for (int n = 0; n < nTried; n++) {
             CAddrInfo info;
-            s >> info;
+            info.Unserialize(s, nType, nVersion);
             int nKBucket = info.GetTriedBucket(nKey);
             int nKBucketPos = info.GetBucketPosition(nKey, false, nKBucket);
             if (vvTried[nKBucket][nKBucketPos] == -1) {
@@ -422,34 +419,11 @@ public:
                 if (nIndex >= 0 && nIndex < nNew) {
                     CAddrInfo &info = mapInfo[nIndex];
                     int nUBucketPos = info.GetBucketPosition(nKey, true, bucket);
-                    if (nVersion == 1 && nUBuckets == ADDRMAN_NEW_BUCKET_COUNT && vvNew[bucket][nUBucketPos] == -1 && info.nRefCount < ADDRMAN_NEW_BUCKETS_PER_ADDRESS) {
+                    if (nVersion >= 1 && nUBuckets == ADDRMAN_NEW_BUCKET_COUNT && vvNew[bucket][nUBucketPos] == -1 && info.nRefCount < ADDRMAN_NEW_BUCKETS_PER_ADDRESS) {
                         info.nRefCount++;
                         vvNew[bucket][nUBucketPos] = nIndex;
                     }
                 }
-            }
-        }
-
-        if (nVersion > 1) {
-            try {
-                int priorityAddressCount = 0;
-                s >> priorityAddressCount;
-                for (int n = 0; n < priorityAddressCount; ++n) {
-                    int index;
-                    s >> index;
-                    index += nNew;
-                    auto info = mapInfo.find(index);
-                    if (info != mapInfo.end()) {
-                        info->second.setKnowsXThin(true);
-                        info->second.setKnowsCash(true);
-                    } else {
-                        LogPrintf("CAddMan: Warning, loading priority address out of range; %d\n", index);
-                    }
-                }
-            } catch (std::runtime_error &e) {
-                // while we are pretty sure that input files hold this data, other clients may decide differently.
-                // expect nothing, be ready for everything.
-                LogPrintf("CAddMan: Reading xthin nodes data from peers.dat failed with: %s\n", e.what());
             }
         }
 
@@ -522,11 +496,14 @@ public:
 
     //! Mark an entry as currently-connected-to.
     void Connected(const CService &addr, int64_t nTime = GetAdjustedTime());
-    
+
     // \internal
     // Ensure that bucket placement is always the same for testing purposes.
     // Do not use outside of tests.
     void MakeDeterministic();
+
+    //! Mark an address as useless. For instance if its misbehaving
+    void increaseUselessness(const CNetAddr &addr, int count = 1);
 
     CAddrInfo* Find(const CNetAddr& addr);
 };

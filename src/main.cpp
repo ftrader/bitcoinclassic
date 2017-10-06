@@ -1365,6 +1365,7 @@ void Misbehaving(NodeId nodeId, int howmuch)
         logCritical(Log::Net) << "Id:" << nodeId << state->nMisbehavior-howmuch << "=>" <<  state->nMisbehavior
                     << "Ban threshold exceeded";
         state->fShouldBan = true;
+        addrman.increaseUselessness(state->address, 2);
     } else {
         logWarning(Log::Net) << "Misbehaving" << "Id:" << nodeId << state->nMisbehavior-howmuch << "=>" << state->nMisbehavior;
     }
@@ -4215,6 +4216,7 @@ bool static ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vR
             pfrom->PushMessage(NetMsgType::REJECT, strCommand, REJECT_OBSOLETE,
                                strprintf("Version must be %d or greater", MIN_PEER_PROTO_VERSION));
             pfrom->fDisconnect = true;
+            addrman.increaseUselessness(pfrom->addr, 2);
             return false;
         }
 
@@ -5435,6 +5437,7 @@ bool ProcessMessages(CNode* pfrom)
         if (pfrom->nVersion == 0) { // uninitialized.
             if (!pfrom->fInbound // we already set isCashNode bool to right value.
                     && memcmp(msg.hdr.pchMessageStart, pfrom->magic(), MESSAGE_START_SIZE) != 0) {
+                addrman.increaseUselessness(pfrom->addr);
                 fOk = false;
                 break;
             }
@@ -5443,6 +5446,7 @@ bool ProcessMessages(CNode* pfrom)
                 if (memcmp(msg.hdr.pchMessageStart, chainparams.CashMessageStart(), MESSAGE_START_SIZE) != 0) {
                     logWarning(Log::Net) << "ProcessMessage: handshake invalid messageStart"
                                          << SanitizeString(msg.hdr.GetCommand()) << "peer:" << pfrom->id;
+                    addrman.increaseUselessness(pfrom->addr);
                     fOk = false;
                     break;
                 }
@@ -5452,11 +5456,13 @@ bool ProcessMessages(CNode* pfrom)
             if (GetBoolArg("-flexiblehandshake", true) == false) {
                 // ignore clients that are not using our our net magic headers.
                 if (pfrom->isCashNode != (Application::uahfChainState() != Application::UAHFDisabled)) {
+                    addrman.increaseUselessness(pfrom->addr);
                     fOk = false;
                     break;
                 }
             }
             assert (memcmp(msg.hdr.pchMessageStart, pfrom->magic(), MESSAGE_START_SIZE) == 0);
+            addrman.increaseUselessness(pfrom->addr, -1);
         }
 
         // Read header

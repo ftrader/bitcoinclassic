@@ -385,9 +385,8 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest)
         }
     }
 
-    /// debug print
     logInfo(Log::Net) << Log::precision(1) << Log::Fixed << "trying connection" << (pszDest ? pszDest : addrConnect.ToString())
-            << "lastseen:" << (pszDest ? 0.0 : (double)(GetAdjustedTime() - addrConnect.nTime)/3600.0)
+            << "lastseen:" << (addrConnect.nTime == 0 ? -1 : (GetAdjustedTime() - addrConnect.nTime)/3600.0)
             <<  "hrs";
 
     // Connect
@@ -1054,12 +1053,9 @@ void ThreadSocketHandler()
 
                     if (pnode->nVersion != 0) {
                         bool xthinCapable = pnode->nServices & NODE_XTHIN;
-                        bool cashCapable = pnode->nServices & NODE_BITCOIN_CASH;
                         CAddrInfo *info = addrman.Find(pnode->addr);
-                        if (info) {
+                        if (info)
                             info->setKnowsXThin(xthinCapable);
-                            info->setKnowsCash(cashCapable);
-                        }
                     }
                 }
             }
@@ -1489,12 +1485,9 @@ void DumpAddresses()
             if (pnode->fDisconnect || pnode->nVersion == 0)
                 continue;
             bool xthinCapable = pnode->nServices & NODE_XTHIN;
-            bool cashCapable = pnode->nServices & NODE_BITCOIN_CASH;
             CAddrInfo *info = addrman.Find(pnode->addr);
-            if (info) {
+            if (info)
                 info->setKnowsXThin(xthinCapable);
-                info->setKnowsCash(cashCapable);
-            }
         }
     }
 
@@ -1666,6 +1659,7 @@ void ThreadOpenConnections()
                 continue;
 
             addrConnect = addr;
+            addrConnect.nTime = addr.getLastSuccess();
             break;
         }
 
