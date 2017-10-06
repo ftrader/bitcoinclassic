@@ -37,7 +37,7 @@ class GetBlockChainInfo : public AdminRPCBinding::Parser
 {
 public:
     GetBlockChainInfo() : Parser("getblockchaininfo", Admin::BlockChain::GetBlockChainInfoReply, 500) {}
-    virtual void parser(Streaming::MessageBuilder &builder, const UniValue &result) {
+    virtual void buildReply(Streaming::MessageBuilder &builder, const UniValue &result) {
         const UniValue &chain = find_value(result, "chain");
         builder.add(Admin::BlockChain::Chain, chain.get_str());
         const UniValue &blocks = find_value(result, "blocks");
@@ -99,7 +99,7 @@ public:
         output.push_back(std::make_pair("verbose", UniValue(UniValue::VBOOL, m_verbose ? "1": "0")));
     }
 
-    virtual int messageSizeCalc(const UniValue &result) const {
+    virtual int calculateMessageSize(const UniValue &result) const {
         if (m_verbose) {
             const UniValue &tx = find_value(result, "tx");
             return tx.size() * 70 + 200;
@@ -107,7 +107,7 @@ public:
         return result.get_str().size() / 2 + 20;
     }
 
-    virtual void parser(Streaming::MessageBuilder &builder, const UniValue &result) {
+    virtual void buildReply(Streaming::MessageBuilder &builder, const UniValue &result) {
         if (!m_verbose) {
             std::vector<char> answer;
             boost::algorithm::unhex(result.get_str(), back_inserter(answer));
@@ -190,7 +190,7 @@ public:
         output.push_back(std::make_pair("parameter 1", UniValue(UniValue::VSTR, txid)));
     }
 
-    virtual int messageSizeCalc(const UniValue &result) const {
+    virtual int calculateMessageSize(const UniValue &result) const {
         return result.get_str().size() / 2 + 20;
     }
 };
@@ -302,13 +302,13 @@ public:
             output.push_back(UniValue(sigHashType));
     }
 
-    virtual int messageSizeCalc(const UniValue &result) const {
+    virtual int calculateMessageSize(const UniValue &result) const {
         const UniValue &hex = find_value(result, "hex");
         const UniValue &errors = find_value(result, "errors");
         return errors.size() * 300 + hex.get_str().size() / 2 + 10;
     }
 
-    virtual void parser(Streaming::MessageBuilder &builder, const UniValue &result) {
+    virtual void buildReply(Streaming::MessageBuilder &builder, const UniValue &result) {
         const UniValue &hex = find_value(result, "hex");
         std::vector<char> bytearray;
         boost::algorithm::unhex(hex.get_str(), back_inserter(bytearray));
@@ -348,7 +348,7 @@ class ListUnspent : public AdminRPCBinding::Parser
 public:
     ListUnspent() : Parser("listunspent", Admin::Wallet::ListUnspentReply) {}
 
-    virtual int messageSizeCalc(const UniValue &result) const {
+    virtual int calculateMessageSize(const UniValue &result) const {
         return result.size() * 300;
     }
 
@@ -390,7 +390,7 @@ public:
             output.push_back(std::make_pair("addresses", list));
     }
 
-    virtual void parser(Streaming::MessageBuilder &builder, const UniValue &result) {
+    virtual void buildReply(Streaming::MessageBuilder &builder, const UniValue &result) {
         bool first = true;
         for (const UniValue &item : result.getValues()) {
             if (first) first = false;
@@ -420,7 +420,7 @@ class GetNewAddress : public AdminRPCBinding::Parser
 {
 public:
     GetNewAddress() : Parser("getnewaddress", Admin::Wallet::GetNewAddressReply, 50) {}
-    virtual void parser(Streaming::MessageBuilder &builder, const UniValue &result) {
+    virtual void buildReply(Streaming::MessageBuilder &builder, const UniValue &result) {
         builder.add(Admin::Wallet::BitcoinAddress, result.get_str());
     }
 };
@@ -432,7 +432,7 @@ class CreateAddress : public AdminRPCBinding::Parser
 public:
     CreateAddress() : Parser("createaddress", Admin::Util::CreateAddressReply, 150) {}
 
-    virtual void parser(Streaming::MessageBuilder &builder, const UniValue &result) {
+    virtual void buildReply(Streaming::MessageBuilder &builder, const UniValue &result) {
         const UniValue &address = find_value(result, "address");
         builder.add(Admin::Util::BitcoinAddress, address.get_str());
         const UniValue &scriptPubKey = find_value(result, "scriptPubKey");
@@ -449,7 +449,7 @@ class ValidateAddress : public AdminRPCBinding::Parser {
 public:
     ValidateAddress() : Parser("validateaddress", Admin::Util::ValidateAddressReply, 300) {}
 
-    virtual void parser(Streaming::MessageBuilder &builder, const UniValue &result) {
+    virtual void buildReply(Streaming::MessageBuilder &builder, const UniValue &result) {
         const UniValue &isValid = find_value(result, "isvalid");
         builder.add(Admin::Util::IsValid, isValid.getBool());
         const UniValue &address = find_value(result, "address");
@@ -524,14 +524,14 @@ AdminRPCBinding::Parser *AdminRPCBinding::createParser(const Message &message)
 }
 
 
-AdminRPCBinding::Parser::Parser(const std::string &method, int answerMessageId, int reserve)
-    : m_reserve(reserve),
-      m_answerMessageId(answerMessageId),
+AdminRPCBinding::Parser::Parser(const std::string &method, int answerMessageId, int messageSize)
+    : m_messageSize(messageSize),
+      m_replyMessageId(answerMessageId),
       m_method(method)
 {
 }
 
-void AdminRPCBinding::Parser::parser(Streaming::MessageBuilder &builder, const UniValue &result)
+void AdminRPCBinding::Parser::buildReply(Streaming::MessageBuilder &builder, const UniValue &result)
 {
     std::vector<char> answer;
     boost::algorithm::unhex(result.get_str(), back_inserter(answer));
@@ -542,7 +542,7 @@ void AdminRPCBinding::Parser::createRequest(const Message &, UniValue &)
 {
 }
 
-int AdminRPCBinding::Parser::messageSizeCalc(const UniValue &result) const
+int AdminRPCBinding::Parser::calculateMessageSize(const UniValue &result) const
 {
     return result.get_str().size() + 20;
 }

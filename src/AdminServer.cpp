@@ -234,8 +234,8 @@ void Admin::Server::Connection::incomingMessage(const Message &message)
         }
         m_bufferPool.reserve(parser->messageSize(result));
         Streaming::MessageBuilder builder(m_bufferPool);
-        parser->parser(builder, result);
-        Message reply = builder.message(message.serviceId(), parser->answerMessageId());
+        parser->buildReply(builder, result);
+        Message reply = builder.message(message.serviceId(), parser->replyMessageId());
         const int requestId = message.headerInt(Admin::RequestId);
         if (requestId != -1)
             reply.setHeaderInt(Admin::RequestId, requestId);
