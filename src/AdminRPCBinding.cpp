@@ -219,6 +219,16 @@ public:
     }
 };
 
+class GetBlockCount : public AdminRPCBinding::DirectParser
+{
+public:
+    GetBlockCount() : DirectParser(Admin::BlockChain::GetBlockCountReply, 20) {}
+
+    void buildReply(const Message&, Streaming::MessageBuilder &builder) {
+        builder.add(Admin::BlockChain::Height, chainActive.Height());
+    }
+};
+
 // raw transactions
 
 class GetRawTransaction : public AdminRPCBinding::RpcParser
@@ -533,6 +543,8 @@ AdminRPCBinding::Parser *AdminRPCBinding::createParser(const Message &message)
             return new GetBlock();
         case Admin::BlockChain::GetBlockHeader:
             return new GetBlockHeader();
+        case Admin::BlockChain::GetBlockCount:
+            return new GetBlockCount();
         }
         break;
     case Admin::ControlService:

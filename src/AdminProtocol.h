@@ -159,8 +159,9 @@ enum MessageIds {
     GetBlockReply,
     GetBlockHeader,
     GetBlockHeaderReply,
-//   getblockcount
-//   getblockhash index
+    GetBlockCount,
+    GetBlockCountReply,
+//   getblockhash index // maybe not needed as we add a height to GetBlock and GetBlockHeader?
 //   getchaintips
 //   getdifficulty
 //   getmempoolinfo
