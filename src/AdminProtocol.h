@@ -1,6 +1,6 @@
 /*
  * This file is part of the bitcoin-classic project
- * Copyright (C) 2016 Tom Zander <tomz@freedommail.ch>
+ * Copyright (C) 2016-2017 Tom Zander <tomz@freedommail.ch>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -157,9 +157,11 @@ enum MessageIds {
     GetBestBlockHashReply,
     GetBlock,
     GetBlockReply,
-//   getblockcount
-//   getblockhash index
-//   getblockheader "hash" ( verbose )
+    GetBlockHeader,
+    GetBlockHeaderReply,
+    GetBlockCount,
+    GetBlockCountReply,
+//   getblockhash index // maybe not needed as we add a height to GetBlock and GetBlockHeader?
 //   getchaintips
 //   getdifficulty
 //   getmempoolinfo
