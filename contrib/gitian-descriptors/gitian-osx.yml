@@ -21,7 +21,7 @@ packages:
 - "libbz2-dev"
 - "ca-certificates"
 - "python"
-reference_datetime: "2017-07-28 00:00:00"
+reference_datetime: "2017-10-09 00:00:00"
 remotes:
 - "url": "https://github.com/bitcoinclassic/bitcoinclassic.git"
   "dir": "bitcoin"

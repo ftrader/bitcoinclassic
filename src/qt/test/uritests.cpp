@@ -6,11 +6,16 @@
 
 #include "guiutil.h"
 #include "walletmodel.h"
+#include <Application.h>
+
+#include <chainparams.h>
 
 #include <QUrl>
 
 void URITests::uriTests()
 {
+    Application::setUahfChainState(Application::UAHFWaiting);
+    SelectParams(CBaseChainParams::REGTEST);
     SendCoinsRecipient rv;
     QUrl uri;
     uri.setUrl(QString("bitcoincash:175tWpb8K1S7NmH4Zx6rewF9WQrcZv245W?req-dontexist="));
