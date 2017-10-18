@@ -64,11 +64,6 @@ struct Params {
     int64_t nPowTargetSpacing;
     int64_t nPowTargetTimespan;
     int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
-
-    /** remove blocksize-limit protocol-upgrade activation parameters */
-    int nActivateSizeForkMajority;
-    int64_t nSizeForkGracePeriod;
-    int64_t nSizeForkExpiration;
 };
 } // namespace Consensus
 
